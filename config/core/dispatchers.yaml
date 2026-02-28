@@ -1,0 +1,6 @@
+semantic_scholar_api:
+  url: https://api.semanticscholar.org/
+  max_retries: 5
+  rpm: 20
+  delay_per_request: 1
+  backoff_factor: 2

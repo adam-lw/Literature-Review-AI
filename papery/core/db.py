@@ -1,0 +1,58 @@
+import os
+from sqlalchemy import create_engine, inspect
+from dotenv import load_dotenv
+import pandas as pd
+import asyncio
+
+load_dotenv()
+
+ENGINE = create_engine(
+    f"postgresql+psycopg2://"
+    f"{os.getenv('PGUSER')}:"
+    f"{os.getenv('PGPASSWORD')}@"
+    f"{os.getenv('PGHOST')}:"
+    f"{os.getenv('PGPORT')}/"
+    f"{os.getenv('PGDATABASE')}",
+    pool_size=10,
+    max_overflow=20,
+)
+
+
+def save_table(df: pd.DataFrame, table_path: str, if_exists: str = "fail"):
+    """Saves a Pandas DataFrame to PostgresSQL based on .env settings."""
+
+    parts = table_path.split(".")
+    if len(parts) == 1:
+        schema = "public"
+        table_name = parts
+    elif len(parts) == 2:
+        schema, table_name = parts
+    else:
+        raise ValueError(
+            f"Unexpected table_path format {table_path}. Hint: provide path in format `schema.table`"
+        )
+
+    df.to_sql(
+        table_name,
+        ENGINE,
+        schema=schema,
+        if_exists=if_exists,
+        index=False,
+        method="multi",
+        chunksize=10_000,
+    )
+
+
+async def save_table_async(df: pd.DataFrame, table_path: str, if_exists: str = "fail"):
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, save_table, df, table_path, if_exists)
+
+
+def load_table(table_path: str) -> pd.DataFrame:
+    """Loads a table from PostgreSQL into a Pandas DataFrame based on .env settings."""
+    query = f"SELECT * FROM {table_path}"
+    return pd.read_sql(query, ENGINE)
+
+
+def get_inspector():
+    return inspect(ENGINE)
