@@ -6,8 +6,7 @@
   - [Technical Description](#technical-description)
     - [Application Design](#application-design)
     - [Preliminary Data Collection](#preliminary-data-collection)
-    - [(WIP) Agentic Paper Writing](#wip-agentic-paper-writing)
-  - [Experimental Results](#experimental-results)
+    - [Agentic Paper Writing](#agentic-paper-writing)
 
 ## Description
 
@@ -52,12 +51,9 @@ The reasoning behind this overall approach is partially down to several technica
 To allow AI agents to collect papers in parallel without exceeding the API's rate limits, I have implemented a dispatcher/consumer architecture with asyncio which automatically manages concurrent requests from multiple agents, while exposing an easily configurable config for managing APIs. This is made available via a helper function, `call_api`.
 
 
-### (WIP) Agentic Paper Writing
+### Agentic Paper Writing
 
 The system uses a combination of a hard-coded rules-based DAG with an agentic architecture, coded fully from scratch in Python. Agents are allowed to call a limited set of tools, dictated by the controller, with tool calls potentially invoking further sub-agents and hard coded validation steps. Agents are implemented with a ReAct-like architecture (reflect, plan, act, repeat), using context summarisation to compress context and improve agent reliability.
 
 RAG is used for paper synthesis, using a vector search across the retrieved papers. The papers were split into chunks, prepended with context about the paper itself, and encoded using an embedding model. 
-
-## Experimental Results
-WIP
 
