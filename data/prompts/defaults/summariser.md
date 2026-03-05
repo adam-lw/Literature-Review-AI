@@ -44,3 +44,6 @@ Create a stable summary that allows a downstream model to behave as if it had re
 - Keep length to the minimum required for correctness.
 
 Your role is to preserve the conversation’s *usable state*, not to retell it.
+
+# Context History:
+{{ context }}
