@@ -1,4 +1,5 @@
 # (WIP) Papery : Agent-driven Literature Reviews
+[![CI](https://img.shields.io/github/actions/workflow/status/adam-lw/Literature-Review-AI/.github/workflows/ci.yml?branch=main)](https://github.com/adam-lw/Literature-Review-AI/actions)
 
 - [(WIP) Papery : Agent-driven Literature Reviews](#wip-papery--agent-driven-literature-reviews)
   - [Description](#description)
