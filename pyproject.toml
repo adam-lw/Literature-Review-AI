@@ -1,7 +1,7 @@
 [project]
 name = "papery"
 package-mode = false
-version = "0.1.0"
+version = "0.0.1"
 description = "Agentic AI application for telling you the weather throughout your planned drive."
 authors = [
     {name = "Adam",email = "adamwilliams0401@gmail.com"}
