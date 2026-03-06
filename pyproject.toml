@@ -1,7 +1,7 @@
 [project]
 name = "papery"
 package-mode = false
-version = "0.1.0"
+version = "0.0.1"
 description = "Agentic AI application for telling you the weather throughout your planned drive."
 authors = [
     {name = "Adam",email = "adamwilliams0401@gmail.com"}
@@ -31,4 +31,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^7.1.0"
 ruff = "^0.14.10"
+mypy = "^1.19.1"
+types-pyyaml = "^6.0.12.20250915"
+pandas-stubs = "^3.0.0.260204"
+pytest = "^9.0.2"
 

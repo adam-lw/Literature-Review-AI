@@ -1,0 +1,52 @@
+# Use with create_dataset_pipeline in papery/pipeline/create_dataset.py
+
+# Output table location
+table_save_path: "test.test_papers_dataset"
+overwrite_table: True
+
+# List of queries to run to generate dataset
+query_list: 
+  - "deep learning"
+  - "reinforcement learning"
+  - "natural language processing"
+  - "computer vision"
+  - "machine learning diagnostics"
+  - "AI assisted drug discovery"
+
+# List of research fields to search within
+research_fields:
+  - Computer Science
+  - Mathematics
+  - Medicine
+  - Chemistry
+
+# Paper metadata to return
+return_fields:
+  - paperId
+  - title
+  - abstract
+  - venue
+  - year
+  - citationCount
+  - influentialCitationCount
+  - fieldsOfStudy
+  - isOpenAccess
+  - publicationTypes
+
+# Output sorting
+sort_by: "citationCount"
+ascending: False
+
+# Publication types to query (papers, datasets, conference articles, ...)
+publication_types: 
+  - "JournalArticle"
+  - "Conference"
+
+# Date range (as tuple, inclusive)
+years: [2015, 2025]
+
+# N results to save per query. Note, this is before de-duplication if similar queries return the same papers
+results_per_query: 10000
+
+# Whether or not the pipeline is being used by an agent
+agent_mode: False
