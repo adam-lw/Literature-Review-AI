@@ -10,4 +10,5 @@ __all__ = [
     "ToolForbiddenException",
     "ToolNotFoundException",
     "call_tool",
+    "tool",
 ]
