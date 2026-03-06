@@ -25,7 +25,7 @@ jobs:
           poetry-version: "2.2.1"
 
       - name: Install dependencies
-        run: poetry install --no-interaction
+        run: poetry install --no-interaction --all-groups
 
       - name: Run Ruff
         run: poetry run ruff check .
