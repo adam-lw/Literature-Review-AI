@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import os
 from typing import Optional
 from pydantic import BaseModel
 import asyncio
@@ -32,13 +33,10 @@ def get_llm(model: str, parser: Optional[BaseModel] = None) -> LLM:
     from papery.core.llm.openai import OPENAI_MODELS, OpenAiLLM
     from papery.core.llm.anthropic import ANTHROPIC_MODELS, AnthropicLLM
     from papery.core.llm.wrappers import ParsingLLM
+    from papery.core.llm.langfuse import LangfuseLLM
 
-    # optional langfuse wrapper
-    try:
-        from papery.core.llm.langfuse import LangfuseLLM
-    except Exception:
-        LangfuseLLM = None
-
+    llm: LLM
+    # Handle base model assignment
     if model in OPENAI_MODELS:
         llm = OpenAiLLM(model)
     elif model in ANTHROPIC_MODELS:
@@ -46,21 +44,15 @@ def get_llm(model: str, parser: Optional[BaseModel] = None) -> LLM:
     else:
         raise ValueError(f"Model `{model}` not found.")
 
+    # Handle wrappers
     if parser is not None:
         llm = ParsingLLM(llm=llm, schema=parser)
 
-    # Wrap with langfuse logging wrapper if available and enabled
-    try:
-        import os
-
-        if LangfuseLLM is not None and os.getenv("LANGFUSE_ENABLED", "0").lower() in (
-            "1",
-            "true",
-            "yes",
-        ):
-            llm = LangfuseLLM(llm=llm)
-    except Exception:
-        # don't fail creation if logging wrapper has issues
-        pass
+    if os.getenv("LANGFUSE_ENABLED", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        llm = LangfuseLLM(llm=llm)
 
     return llm

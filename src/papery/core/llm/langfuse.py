@@ -1,7 +1,6 @@
-import time
-from typing import Any
 from papery.core.llm.core import LLM
-from papery.core.telemetry.langfuse import lf_logger
+import time
+from papery.core.logging.langfuse import lf_logger
 
 
 class LangfuseLLM(LLM):

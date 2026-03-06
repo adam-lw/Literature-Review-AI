@@ -3,6 +3,9 @@ from sqlalchemy import create_engine, inspect
 from dotenv import load_dotenv
 import pandas as pd
 import asyncio
+from typing import Literal
+
+if_exists_options = Literal["fail", "replace", "append", "delete_rows"]
 
 load_dotenv()
 
@@ -18,13 +21,15 @@ ENGINE = create_engine(
 )
 
 
-def save_table(df: pd.DataFrame, table_path: str, if_exists: str = "fail"):
+def save_table(
+    df: pd.DataFrame, table_path: str, if_exists: if_exists_options = "fail"
+):
     """Saves a Pandas DataFrame to PostgresSQL based on .env settings."""
 
     parts = table_path.split(".")
     if len(parts) == 1:
         schema = "public"
-        table_name = parts
+        table_name = parts[0]
     elif len(parts) == 2:
         schema, table_name = parts
     else:
@@ -43,7 +48,9 @@ def save_table(df: pd.DataFrame, table_path: str, if_exists: str = "fail"):
     )
 
 
-async def save_table_async(df: pd.DataFrame, table_path: str, if_exists: str = "fail"):
+async def save_table_async(
+    df: pd.DataFrame, table_path: str, if_exists: if_exists_options = "fail"
+):
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, save_table, df, table_path, if_exists)
 

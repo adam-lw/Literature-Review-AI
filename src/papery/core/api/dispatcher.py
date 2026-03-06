@@ -34,7 +34,7 @@ class Dispatcher:
         self.rpm = rpm
         self.delay_per_request = delay_per_request
 
-        self.queue = asyncio.Queue()
+        self.queue: asyncio.Queue = asyncio.Queue()
         self.state: dispatcher_states = "STOPPED"
         self.requests_60s: list[float] = []
 

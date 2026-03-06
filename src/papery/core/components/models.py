@@ -1,6 +1,5 @@
 from papery.core.llm.core import LLM
 from typing import Optional
-from papery.core.utils import load_prompt
 
 
 class ContextModel:

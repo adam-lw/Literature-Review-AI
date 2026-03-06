@@ -1,7 +1,7 @@
+from pathlib import Path
 from typing import Any
 from papery.core.api.semantic_scholar import bulk_collect_papers
 from papery.pipeline.utils import parse_pipeline_args
-import pandas as pd
 from papery.core.utils import save_dict, load_dict, get_project_root, deep_merge
 from papery.core.db import load_table, save_table
 from datetime import datetime
@@ -13,7 +13,7 @@ import uuid
 from loguru import logger
 
 
-async def dataset_pipeline(config: dict[str, Any], artifact_path: str) -> None:
+async def dataset_pipeline(config: dict[str, Any], artifact_path: Path) -> None:
     """
     Pipeline for creating or extending a dataset of papers given a list of queries.
     """
@@ -49,12 +49,12 @@ async def dataset_pipeline(config: dict[str, Any], artifact_path: str) -> None:
         bulk_collect_papers(
             query=query,
             table_save_path=config.get("table_save_path", "public.papers_dataset"),
-            research_fields=config.get("research_fields"),
-            return_fields=config.get("return_fields"),
-            sort_by=config.get("sort_by"),
-            ascending=config.get("ascending"),
-            publication_types=config.get("publication_types"),
-            years=config.get("years"),
+            research_fields=config.get("research_fields", []),
+            return_fields=config.get("return_fields", []),
+            sort_by=config.get("sort_by", None),
+            ascending=config.get("ascending", False),
+            publication_types=config.get("publication_types", []),
+            years=config.get("years", None),
             n_results=config.get("results_per_query", 1000),
             open_access_only=config.get("open_access_only", True),
             min_citation_count=config.get("min_citation_count", 3),

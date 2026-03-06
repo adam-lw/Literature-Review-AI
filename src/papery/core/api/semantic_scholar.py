@@ -49,13 +49,18 @@ async def bulk_collect_papers(
     config = load_dict(CONFIG_PATH)
 
     # Validate data
-    if not all([field in config.get("research_fields") for field in research_fields]):
+    if not all(
+        [field in config.get("research_fields", []) for field in research_fields]
+    ):
         raise ValueError(
             f"Unrecognised field(s) of study: {[f for f in research_fields if f not in config['research_fields']]}"
         )
 
     if not all(
-        [pubtype in config.get("publication_types") for pubtype in publication_types]
+        [
+            pubtype in config.get("publication_types", [])
+            for pubtype in publication_types
+        ]
     ):
         raise ValueError(
             f"Unrecognised publication type(s): {[p for p in publication_types if p not in config['publication_types']]}"
@@ -108,8 +113,8 @@ async def bulk_collect_papers(
         # custom `api_call` method handles queuing, retrying, etc. for potentially many calls across many applications
         # loop required due to continuation tokens in this instance
         data = await api_call(
-            params=params,
             api_id="semantic_scholar_api",
+            header=params,
             endpoint="graph/v1/paper/search/bulk/",
         )
         print(f"Response length: {len(data.get('data', []))}")
@@ -123,7 +128,7 @@ async def bulk_collect_papers(
             metadata["error"] = data["error"]
             break
 
-        continuation_token = data.get("token")
+        continuation_token = data.get("token", "")
 
         if "n_found" not in metadata.keys():
             metadata["n_found"] = data.get("total", 0)
@@ -166,12 +171,11 @@ async def collect_embeddings(
     response = await asyncio.gather(
         *[
             api_call(
-                params={"fields": f"paperId,embedding.{embedding}"},
-                json={"ids": chunk},
+                header={"fields": f"paperId,embedding.{embedding}"},
+                body={"ids": chunk},
                 api_id="semantic_scholar_api",
                 endpoint="graph/v1/paper/batch",
                 task="POST",
-                verbosity=1,
             )
             for chunk in id_chunks
         ][0:2]

@@ -14,12 +14,12 @@ def load_dict(path: Path | str) -> dict[str, Any]:
         with open(path) as f:
             loaded_dict = yaml.safe_load(f)
     else:
-        raise ValueError(f"Unrecognised path suffix {path.split('.')[-1]}")
+        raise ValueError(f"Unrecognised path suffix {str(path).split('.')[-1]}")
 
     return loaded_dict
 
 
-def save_dict(to_save: dict[str, Any], path: Path | str) -> dict[str, Any]:
+def save_dict(to_save: dict[str, Any], path: Path | str) -> None:
     """Saves a Python dictionary to the provided path. Infers type automatically."""
 
     if not isinstance(to_save, dict):
@@ -34,7 +34,7 @@ def save_dict(to_save: dict[str, Any], path: Path | str) -> dict[str, Any]:
         with open(path, "w", encoding="utf-8") as f:
             yaml.safe_dump(to_save, f, sort_keys=False)
     else:
-        raise ValueError(f"Unrecognised path suffix {path.split('.')[-1]}")
+        raise ValueError(f"Unrecognised path suffix {str(path).split('.')[-1]}")
 
 
 def get_project_root() -> Path:

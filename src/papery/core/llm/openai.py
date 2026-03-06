@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from papery.core.llm.core import LLM
 import os
-from typing import Any
+from typing import Any, Mapping, cast
 
 from openai import AsyncOpenAI
 
@@ -26,7 +26,10 @@ class OpenAiLLM(LLM):
 
     async def call(self, messages: list[dict[str, str]]) -> str:
         messages_text = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
-        response = self.client.responses.create(
-            model=self.model, input=messages_text, **self.config
+
+        config = cast(Mapping[str, Any], self.config)
+
+        response = await self.client.responses.create(
+            model=self.model, input=messages_text, **config
         )
         return response.output_text
