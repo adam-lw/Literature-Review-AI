@@ -13,7 +13,7 @@
 
 *Papery* is an agent-powered tool for the automated writing of literature review, meta-analysis and systematic review papers. 
 
-The project was started in October 2025 with two goals: to be able to replicate existing literature review papers, and to produce new literature reviews from scratch. Manually producing these papers is typically repetitive and time-intensive, diverting researchers' time and effort away from potentially more productive activities in their research. Therefore, this project aims to automate, or significantly accelerate, this task.
+The project was started with two goals: to be able to replicate existing literature review papers, and to produce new literature reviews from scratch. Manually producing these papers is typically repetitive and time-intensive, diverting researchers' time and effort away from potentially more productive activities in their research. Therefore, this project aims to automate, or significantly accelerate, this task.
 
 The tool leverages a hybrid keyword & semantic search for paper retrieval, AI-as-a-Judge & heuristic-based ranking for paper selection, and an agent-driven architecture for paper writing & assessment. The codebase is designed to be deployable in Docker/Kubernetes and will provide an API via FastAPI.
 
