@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 from dotenv import load_dotenv
 import pandas as pd
 import asyncio
@@ -21,8 +21,20 @@ ENGINE = create_engine(
 )
 
 
+def execute_query(query: str):
+    with ENGINE.begin() as conn:
+        return conn.execute(text(query))
+
+
+# Ensure pgvector is installed at import time
+execute_query("CREATE EXTENSION IF NOT EXISTS vector;")
+
+
 def save_table(
-    df: pd.DataFrame, table_path: str, if_exists: if_exists_options = "fail"
+    df: pd.DataFrame,
+    table_path: str,
+    if_exists: if_exists_options = "fail",
+    embedding_cols: list[str] = [],
 ):
     """Saves a Pandas DataFrame to PostgresSQL based on .env settings."""
 
@@ -36,6 +48,13 @@ def save_table(
         raise ValueError(
             f"Unexpected table_path format {table_path}. Hint: provide path in format `schema.table`"
         )
+
+    if embedding_cols:
+        for embedding in embedding_cols:
+            # Ensure the vector is a list of floats (not numpy array or object)
+            df[embedding] = df[embedding].apply(
+                lambda x: list(map(float, x)) if x is not None else None
+            )
 
     df.to_sql(
         table_name,
