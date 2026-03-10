@@ -13,6 +13,7 @@ async def api_call(
     body: dict[str, Any] = {},
     endpoint: str = "/",
     task: Literal["GET", "POST"] = "GET",
+    verbosity: int = 0,
 ) -> dict[str, Any]:
     """
     Inferface for calling APIs using dispatchers. Handles rate limiting, retry logic and logging in parallel
@@ -29,6 +30,12 @@ async def api_call(
     """
     dispatcher = get_dispatcher(api_id)
 
+    if verbosity > 0:
+        logger.info(
+            f"Making API call to {api_id} with endpoint {endpoint} and header {header}"
+        )
+        dispatcher.set_verbosity(1)
+
     # Filter None values in header to stop aiohttp from erroring
     header_filtered = {}
     for k, v in header.items():
@@ -40,17 +47,17 @@ async def api_call(
 
     for attempt in range(dispatcher.max_retries + 1):
         # log a lightweight api request event (will only write if LANGFUSE_ENABLED)
-        try:
-            lf_logger.log_api_call(
-                api_id,
-                endpoint,
-                header_filtered,
-                response=None,
-                duration_s=0.0,
-                error=None,
-            )
-        except Exception:
-            pass
+        # try:
+        #     lf_logger.log_api_call(
+        #         api_id,
+        #         endpoint,
+        #         header_filtered,
+        #         response=None,
+        #         duration_s=0.0,
+        #         error=None,
+        #     )
+        # except Exception:
+        #     pass
 
         future = asyncio.get_running_loop().create_future()
 
@@ -78,18 +85,15 @@ async def api_call(
             429,
             503,
         ]:  # rate limit or service unavailable
-            sleep_time = response.get(
-                "Retry-After", (attempt + 1) * dispatcher.backoff_factor
-            )
-
             logger.warning(
-                f"API call failed with status {response.get('code', 'unknown')}. Retrying in {sleep_time} seconds..."
+                f"API call failed with status {response.get('code', 'unknown')}. Backing off..."
             )
-            await dispatcher.pause(sleep_time)
+            await dispatcher.backoff()
         else:
             logger.info(
                 f"API call successful with status {response.get('code', 'unknown')}."
             )
+            dispatcher.reset_backoff()
             break
 
     return response
