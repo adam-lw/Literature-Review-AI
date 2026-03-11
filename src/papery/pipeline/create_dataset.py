@@ -3,12 +3,13 @@ from typing import Any
 from papery.core.api.semantic_scholar import bulk_collect_papers
 from papery.pipeline.utils import parse_pipeline_args
 from papery.core.utils import save_dict, load_dict, get_project_root, deep_merge
-from papery.core.db import load_table, save_table
+from papery.core.db import load_table, save_table, ENGINE as db_engine
 from datetime import datetime
 import os
 import asyncio
 from papery.core.db import get_inspector
 import uuid
+import math
 
 from loguru import logger
 
@@ -45,30 +46,52 @@ async def dataset_pipeline(config: dict[str, Any], artifact_path: Path) -> None:
             f"Table {table_save_path} already exists. Set `overwrite_table` to True in the config to overwrite it."
         )
 
-    coroutines = [
-        bulk_collect_papers(
-            query=query,
-            table_save_path=config.get("table_save_path", "public.papers_dataset"),
-            research_fields=config.get("research_fields", []),
-            return_fields=config.get("return_fields", []),
-            sort_by=config.get("sort_by", None),
-            ascending=config.get("ascending", False),
-            publication_types=config.get("publication_types", []),
-            years=config.get("years", None),
-            n_results=config.get("results_per_query", 1000),
-            open_access_only=config.get("open_access_only", True),
-            min_citation_count=config.get("min_citation_count", 3),
+    async def gather_query_results(
+        query: str, n_papers: int, collection_config: dict[str, Any]
+    ):
+        n_collections = math.ceil(n_papers / 1000)
+        counter = 0
+        async for resp in bulk_collect_papers(query=query, **collection_config):
+            resp.to_sql(
+                table_save_path,
+                db_engine,
+                if_exists="append",
+                index=False,
+                method="multi",
+                chunksize=10_000,
+            )
+            counter += 1
+            if counter >= n_collections:
+                break
+
+    # Set collection config
+    collection_config = {
+        k: v
+        for k, v in config.items()
+        if k in [
+            "research_fields",
+            "return_fields",
+            "sort_by",
+            "ascending",
+            "publication_types",
+            "years",
+            "open_access_only",
+            "min_citation_count",
+        ]
+    }
+
+    query_coroutines = [
+        gather_query_results(
+            query, config.get("results_per_query", 10000), collection_config
         )
         for query in query_list
     ]
 
-    # Run all queries and save to specified table path
-    results = await asyncio.gather(
-        *coroutines, return_exceptions=config.get("agent_mode", False)
-    )
+    await asyncio.gather(*query_coroutines)
 
     # Deduplicate data
     df = load_table(config.get("table_save_path", "public.papers_dataset"))
+
     logger.info(f"Len before deduplication: {len(df)}")
     df = df.drop_duplicates(subset=["paperId"])
     logger.info(f"Len after deduplication: {len(df)}")
@@ -78,10 +101,6 @@ async def dataset_pipeline(config: dict[str, Any], artifact_path: Path) -> None:
 
     # Save results
     os.makedirs(artifact_path, exist_ok=True)
-    results_path = f"{artifact_path}/dataset_pipeline_log.txt"
-    with open(results_path, "w") as f:
-        for result in results:
-            f.write(f"{result}\n")
 
     # Save pipeline config
     config_path = f"{artifact_path}/config.yaml"

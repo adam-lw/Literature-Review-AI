@@ -37,6 +37,9 @@ class Dispatcher:
         self.queue: asyncio.Queue = asyncio.Queue()
         self.state: dispatcher_states = "STOPPED"
         self.requests_60s: list[float] = []
+        self.backoff_counter = 0
+
+        self.verbosity = 0
 
         print(f"Initialised dispatcher {api_id}")
 
@@ -44,7 +47,8 @@ class Dispatcher:
         """
         Starts running the dispatcher
         """
-        print(f"Started dispatcher {self.api_id}")
+        if self.verbosity > 0:
+            logger.info(f"Started dispatcher {self.api_id}")
         self.state = "RUNNING"
         while self.state == "RUNNING":
             item = await self.queue.get()
@@ -66,9 +70,10 @@ class Dispatcher:
                 if len(self.requests_60s) >= self.rpm:
                     queue_wait = (self.requests_60s[0] + 60) - now
                     queue_wait = 0 if queue_wait < 0 else queue_wait
-                    logger.info(
-                        "Hit RPM limit, resuming in %.2f seconds..." % queue_wait
-                    )
+                    if self.verbosity > 0:
+                        logger.info(
+                            "Hit RPM limit, resuming in %.2f seconds..." % queue_wait
+                        )
                     await asyncio.sleep(queue_wait)
 
             # If time since last request is below delay_per_request, wait the remaining time
@@ -82,7 +87,8 @@ class Dispatcher:
                 )
                 await asyncio.sleep(sleep_time)
 
-            print(f"Dispatcher {self.api_id} processing queue item...")
+            if self.verbosity > 0:
+                logger.info(f"Dispatcher {self.api_id} processing queue item...")
             if task == "GET":
                 task = http_get_task(
                     request=request, endpoint=self.url + endpoint, future=future
@@ -99,9 +105,14 @@ class Dispatcher:
     async def add_to_queue(
         self, request: Any, endpoint: str, future: asyncio.Future, task: str
     ):
-        logger.info(f"Adding to queue: {request}")
+        if self.verbosity > 0:
+            request_string = (
+                str(request)[0:500] + "..." if len(str(request)) > 500 else str(request)
+            )
+            logger.info(f"Adding to queue: {request_string}")
         await self.queue.put((request, endpoint, future, task))
-        logger.info(f"Queue size is now {self.queue.qsize()}")
+        if self.verbosity > 0:
+            logger.info(f"Queue size is now {self.queue.qsize()}")
 
     def get_api_id(self) -> str:
         return self.api_id
@@ -109,17 +120,33 @@ class Dispatcher:
     def get_max_retries(self) -> int:
         return self.max_retries
 
-    async def pause(self, time: float) -> None:
+    async def backoff(self) -> None:
         """
         Pauses the dispatcher for a given amount of time (in seconds).
         During this time, the dispatcher will not process any items from the queue.
 
         This can be used to implement backoff across all callers when the API asks us to slow down.
         """
+        self.backoff_counter += 1
+        backoff_time = self.backoff_factor * (self.backoff_counter**2)
         if self.state == "RUNNING":
             self.state = "PAUSED"
-            await asyncio.sleep(time)
+            if self.verbosity > 0:
+                logger.warning(
+                    f"Pausing dispatcher {self.api_id} for {backoff_time} seconds..."
+                )
+            await asyncio.sleep(backoff_time)
             self.state = "RUNNING"
+
+    def reset_backoff(self) -> None:
+        """
+        Resets the dispatcher's exponential backoff counter.
+        """
+        self.backoff_counter = 0
+
+    def set_verbosity(self, level: int):
+        # Placeholder for setting verbosity level of the dispatcher (e.g. for logging)
+        self.verbosity = level
 
 
 class DispatcherRegistry:
