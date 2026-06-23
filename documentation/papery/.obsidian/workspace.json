@@ -1,0 +1,210 @@
+{
+  "main": {
+    "id": "330dfaa8e02ba392",
+    "type": "split",
+    "children": [
+      {
+        "id": "8c4ee4629cf7a48d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a12b3b9adcae863f",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Paper Search/Semantic Scholar API.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Semantic Scholar API"
+            }
+          },
+          {
+            "id": "542456d1d29a5e83",
+            "type": "leaf",
+            "state": {
+              "type": "release-notes",
+              "state": {
+                "currentVersion": "1.11.7"
+              },
+              "icon": "lucide-book-up",
+              "title": "Release Notes 1.11.7"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "5ca1cfd8dc9d236a",
+    "type": "split",
+    "children": [
+      {
+        "id": "19061362905219ea",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "407278e9134e2e1e",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "393c7e613fb6312f",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "fbf461508cd12026",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "9aa5546a84e8a68d",
+    "type": "split",
+    "children": [
+      {
+        "id": "6dfc52e52f249381",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "fa52fe8de72b7a57",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Miscellaneous Notes/RAG Design and Evaluation.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for RAG Design and Evaluation"
+            }
+          },
+          {
+            "id": "49e7b647a797e174",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Miscellaneous Notes/RAG Design and Evaluation.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from RAG Design and Evaluation"
+            }
+          },
+          {
+            "id": "4af3c19b779fed47",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "b7fd2ee28844f52a",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "95b955c4542acf44",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Miscellaneous Notes/RAG Design and Evaluation.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of RAG Design and Evaluation"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "542456d1d29a5e83",
+  "lastOpenFiles": [
+    "1. Design Notes/Choice of Embedding Model.md",
+    "Paper Search/Semantic Scholar API.md",
+    "Paper Search",
+    "Miscellaneous Notes/RAG Design and Evaluation.md",
+    "Miscellaneous Notes/evaluation.md",
+    "Welcome.md",
+    "Miscellaneous Notes",
+    "1. Design Notes"
+  ]
+}

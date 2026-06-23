@@ -1,0 +1,64 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.3.0 Chrome/140.0.7339.249 Electron/38.7.2 Safari/537.36" version="29.3.0">
+  <diagram name="Page-1" id="-pZMKtqKow58wGI7uc5J">
+    <mxGraphModel dx="1177" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Application" vertex="1">
+          <mxGeometry height="60" width="120" x="310" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="call_api" vertex="1">
+          <mxGeometry height="140" width="120" x="480" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Application" vertex="1">
+          <mxGeometry height="60" width="120" x="310" y="360" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Application" vertex="1">
+          <mxGeometry height="60" width="120" x="310" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Queue" vertex="1">
+          <mxGeometry height="60" width="120" x="650" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Rate-Limited Dispatcher" vertex="1">
+          <mxGeometry height="60" width="120" x="820" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Task" vertex="1">
+          <mxGeometry height="60" width="120" x="1000" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Task" vertex="1">
+          <mxGeometry height="60" width="120" x="990" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="Task" vertex="1">
+          <mxGeometry height="60" width="120" x="980" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--10" parent="1" style="ellipse;shape=cloud;whiteSpace=wrap;html=1;" value="API" vertex="1">
+          <mxGeometry height="170" width="250" x="1160" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--11" edge="1" parent="1" style="endArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="1140" y="410" as="sourcePoint" />
+            <mxPoint x="610" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--12" edge="1" parent="1" source="ppDqmGUCSEuNFVgGWbh--3" style="endArrow=classic;startArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" value="">
+          <mxGeometry height="50" relative="1" width="50" as="geometry">
+            <mxPoint x="820" y="490" as="sourcePoint" />
+            <mxPoint x="470" y="390" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--13" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Adds tasks to the queue" vertex="1">
+          <mxGeometry height="30" width="60" x="600" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="Checks header of response to see if we need to retry, or pause the dispatcher" vertex="1">
+          <mxGeometry height="30" width="60" x="590" y="470" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--19" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="If header is good" vertex="1">
+          <mxGeometry height="30" width="60" x="440" y="455" as="geometry" />
+        </mxCell>
+        <mxCell id="ppDqmGUCSEuNFVgGWbh--20" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="We want to abstract rate limits, retrying, backoff from application, but not any other problems" vertex="1">
+          <mxGeometry height="30" width="60" x="460" y="600" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

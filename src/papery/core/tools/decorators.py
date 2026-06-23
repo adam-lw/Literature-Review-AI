@@ -1,7 +1,6 @@
 import inspect
 from typing import Callable, Optional, get_type_hints, Any, Dict
-
-TOOL_REGISTRY = []
+from .core import TOOL_REGISTRY
 
 
 def tool(
