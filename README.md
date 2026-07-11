@@ -1,7 +1,7 @@
-# (WIP) Papery : Agent-driven Literature Reviews
+# (WIP) Literature AI : Agent-driven Literature Reviews
 [![CI](https://img.shields.io/github/actions/workflow/status/adam-lw/Literature-Review-AI/.github/workflows/ci.yml?branch=main)](https://github.com/adam-lw/Literature-Review-AI/actions)
 
-- [(WIP) Papery : Agent-driven Literature Reviews](#wip-papery--agent-driven-literature-reviews)
+- [(WIP) Literature AI : Agent-driven Literature Reviews](#wip-literature-ai--agent-driven-literature-reviews)
   - [Description](#description)
   - [Background](#background)
   - [Technical Description](#technical-description)
@@ -11,7 +11,7 @@
 
 ## Description
 
-*Papery* is an agent-powered tool for the automated writing of literature review, meta-analysis and systematic review papers. 
+*Literature AI* is an agent-powered tool for the automated writing of literature review, meta-analysis and systematic review papers. 
 
 The project was started with two goals: to be able to replicate existing literature review papers, and to produce new literature reviews from scratch. Manually producing these papers is typically repetitive and time-intensive, diverting researchers' time and effort away from potentially more productive activities in their research. Therefore, this project aims to automate, or significantly accelerate, this task.
 

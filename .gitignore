@@ -218,4 +218,5 @@ __marimo__/
 
 # Project
 artifacts/
+data/
 .vscode/
