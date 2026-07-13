@@ -2,8 +2,8 @@
 
 # Stage toggles — set to false to skip a stage
 stages:
-  collect_papers: true
-  clean_paper: true
+  collect_papers: false
+  clean_paper: false
   embeddings: true
 
 collect_papers:
@@ -14,16 +14,16 @@ collect_papers:
   queries:
     - query: "deep learning"
       research_fields: [Computer Science, Mathematics]
-    - query: "reinforcement learning"
-      research_fields: [Computer Science]
-    - query: "natural language processing"
-      research_fields: [Computer Science]
-    - query: "computer vision"
-      research_fields: [Computer Science]
-    - query: "machine learning diagnostics"
-      research_fields: [Computer Science, Medicine]
-    - query: "AI assisted drug discovery"
-      research_fields: [Medicine, Chemistry]
+    # - query: "reinforcement learning"
+    #   research_fields: [Computer Science]
+    # - query: "natural language processing"
+    #   research_fields: [Computer Science]
+    # - query: "computer vision"
+    #   research_fields: [Computer Science]
+    # - query: "machine learning diagnostics"
+    #   research_fields: [Computer Science, Medicine]
+    # - query: "AI assisted drug discovery"
+    #   research_fields: [Medicine, Chemistry]
 
   # Output sorting (global default, overridable per query)
   sort_by: "citationCount"
@@ -33,7 +33,7 @@ collect_papers:
   years: [2015, 2025]
 
   # N results to save per query
-  results_per_query: 1000
+  results_per_query: 200
 
 
 embeddings:
@@ -42,9 +42,10 @@ embeddings:
     - specter_v2
 
   # Models to generate locally (e.g. text-embedding-3-small, text-embedding-3-large)
-  generate: []
+  generate:
+    - text-embedding-3-small
 
-  # Automatically create an HNSW index for each model run above
+  # Automatically create a HNSW index for each model run above
   create_index: true
   index:
     m: 16

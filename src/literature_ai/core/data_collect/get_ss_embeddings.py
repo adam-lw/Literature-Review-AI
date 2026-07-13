@@ -106,8 +106,20 @@ def collect_embeddings(embedding: Literal["specter_v1", "specter_v2"]) -> int | 
         row[0]: _hash_abstract(row[1]) for row in input_result.fetchall()
     }
 
+    try:
+        run_id, _ = resolve_embedding_run(embedding, None, n_dim=dim, user_tags={})
+    except ValueError:
+        run_id = create_embedding_run(
+            embedding_model=embedding,
+            embedding_version=None,
+            n_dim=dim,
+            user_tags={},
+            source="collect",
+        )
+    logger.info(f"collect_embeddings run_id: {run_id}")
+
     existing_result = execute_query(
-        f'SELECT "paperId", content_hash FROM {EMBEDDINGS_TABLE} WHERE "{embedding_col}" IS NOT NULL'
+        f'SELECT "paperId", content_hash FROM {EMBEDDINGS_TABLE} WHERE run_id = {run_id}'
     )
     existing_hashes: dict[str, str] = {
         row[0]: row[1] for row in existing_result.fetchall()
@@ -125,18 +137,6 @@ def collect_embeddings(embedding: Literal["specter_v1", "specter_v2"]) -> int | 
     if not ids_to_process:
         return None
 
-    try:
-        run_id, _ = resolve_embedding_run(embedding, None, n_dim=dim, user_tags={})
-    except ValueError:
-        run_id = create_embedding_run(
-            embedding_model=embedding,
-            embedding_version=None,
-            n_dim=dim,
-            user_tags={},
-            source="collect",
-        )
-    logger.info(f"collect_embeddings run_id: {run_id}")
-
     async def _run():
         async for batch in _collect_embedding_generator(ids_to_process, embedding):
             now = datetime.now(timezone.utc)
@@ -150,7 +150,7 @@ def collect_embeddings(embedding: Literal["specter_v1", "specter_v2"]) -> int | 
                 }
                 for item in batch
             ]
-            upsert_table(records, EMBEDDINGS_TABLE, conflict_cols=["paperId"], do_update=True)
+            upsert_table(records, EMBEDDINGS_TABLE, conflict_cols=["paperId", "run_id"], do_update=True)
             logger.info(f"Upserted {len(records)} embeddings")
 
     asyncio.run(_run())

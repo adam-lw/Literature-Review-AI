@@ -72,11 +72,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS embedding_runs_metadata_unique
         "source"
     );
 
--- Abstract embeddings. Embedding columns (e.g. embedding_768 VECTOR(768)) are added
--- dynamically via ALTER TABLE when a new model dimension is first collected.
+-- Abstract embeddings. One row per (paperId, run_id). Embedding columns (e.g. embedding_768
+-- VECTOR(768)) are added dynamically via ALTER TABLE when a new model dimension is first seen.
 CREATE TABLE IF NOT EXISTS processed.abstract_embeddings (
-    "paperId"       TEXT PRIMARY KEY,
-    "run_id"        BIGINT REFERENCES processed.embedding_runs_metadata("run_id"),
+    "paperId"       TEXT NOT NULL REFERENCES raw.raw_paper_searches("paperId"),
+    "run_id"        BIGINT NOT NULL REFERENCES processed.embedding_runs_metadata("run_id"),
     "processed_at"  TIMESTAMP WITH TIME ZONE,
-    "content_hash"  TEXT
+    "content_hash"  TEXT,
+    PRIMARY KEY ("paperId", "run_id")
 );

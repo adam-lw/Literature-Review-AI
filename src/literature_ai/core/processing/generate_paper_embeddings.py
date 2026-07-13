@@ -48,8 +48,20 @@ def generate_paper_embeddings(embedding_model: str) -> int | None:
     input_hashes = {row[0]: _hash_content(row[1], row[2]) for row in rows}
     input_data = {row[0]: (row[1] or "", row[2] or "") for row in rows}
 
+    try:
+        run_id, _ = resolve_embedding_run(embedding_model, version, n_dim=dim, user_tags={})
+    except ValueError:
+        run_id = create_embedding_run(
+            embedding_model=embedding_model,
+            embedding_version=version,
+            n_dim=dim,
+            user_tags={},
+            source="generate",
+        )
+    logger.info(f"generate_paper_embeddings run_id: {run_id}")
+
     existing_result = execute_query(
-        f'SELECT "paperId", content_hash FROM {EMBEDDINGS_TABLE} WHERE "{embedding_col}" IS NOT NULL'
+        f'SELECT "paperId", content_hash FROM {EMBEDDINGS_TABLE} WHERE run_id = {run_id}'
     )
     existing_hashes = {r[0]: r[1] for r in existing_result.fetchall()}
 
@@ -64,18 +76,6 @@ def generate_paper_embeddings(embedding_model: str) -> int | None:
 
     if not ids_to_process:
         return None
-
-    try:
-        run_id, _ = resolve_embedding_run(embedding_model, version, n_dim=dim, user_tags={})
-    except ValueError:
-        run_id = create_embedding_run(
-            embedding_model=embedding_model,
-            embedding_version=version,
-            n_dim=dim,
-            user_tags={},
-            source="generate",
-        )
-    logger.info(f"generate_paper_embeddings run_id: {run_id}")
 
     async def _run():
         for i in range(0, len(ids_to_process), BATCH_SIZE):
@@ -93,7 +93,7 @@ def generate_paper_embeddings(embedding_model: str) -> int | None:
                 }
                 for pid, vec in zip(batch_ids, vectors)
             ]
-            upsert_table(records, EMBEDDINGS_TABLE, conflict_cols=["paperId"], do_update=True)
+            upsert_table(records, EMBEDDINGS_TABLE, conflict_cols=["paperId", "run_id"], do_update=True)
             logger.info(f"Upserted {len(records)} embeddings (batch {i // BATCH_SIZE + 1})")
 
     asyncio.run(_run())

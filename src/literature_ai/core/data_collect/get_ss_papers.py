@@ -171,7 +171,10 @@ def collect_papers(
                 min_citation_count=query_settings.get("min_citation_count", min_citation_count),
                 verbosity=verbosity,
             ):
-                print(f"batch[0]: {batch[0]}")
+                if results_per_query:
+                    remaining = results_per_query - collected
+                    if len(batch) > remaining:
+                        batch = batch[:remaining]
                 now = datetime.now(timezone.utc)
                 for record in batch:
                     # Handle subdictionaries for write
