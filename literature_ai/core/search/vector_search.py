@@ -51,12 +51,14 @@ async def vector_search_async(
             r.year,
             r.venue,
             r."citationCount",
-            ae."{embedding_col}" <-> CAST(:query_vec AS vector) AS distance
+            r.url,
+            r."DOI",
+            ae."{embedding_col}" <=> CAST(:query_vec AS vector) AS distance
         FROM {EMBEDDINGS_TABLE} ae
         JOIN raw.raw_paper_searches r ON ae."paperId" = r."paperId"
         WHERE ae.run_id = :run_id
           AND ae."{embedding_col}" IS NOT NULL
-        ORDER BY ae."{embedding_col}" <-> CAST(:query_vec AS vector)
+        ORDER BY ae."{embedding_col}" <=> CAST(:query_vec AS vector)
         LIMIT :n_results
     """)
 
@@ -66,7 +68,7 @@ async def vector_search_async(
             {"query_vec": query_vec_str, "run_id": run_id, "n_results": n_results},
         ).fetchall()
 
-    keys = ["paperId", "title", "abstract", "year", "venue", "citationCount", "distance"]
+    keys = ["paperId", "title", "abstract", "year", "venue", "citationCount", "url", "DOI", "distance"]
     return [dict(zip(keys, row)) for row in rows]
 
 

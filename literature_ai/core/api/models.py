@@ -19,6 +19,8 @@ class SearchResult(BaseModel):
     year: Optional[int] = None
     venue: Optional[str] = None
     citationCount: Optional[int] = None
+    url: Optional[str] = None
+    DOI: Optional[str] = None
     distance: float
 
 
