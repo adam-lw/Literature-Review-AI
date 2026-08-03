@@ -68,6 +68,9 @@ _MODEL_CACHE: dict[str, EmbeddingModel] = {}
 def get_embedding_model(model: str) -> EmbeddingModel:
     if model not in _MODEL_CACHE:
         from literature_ai.core.embeddings.specter import SpecterV1Embedding, SpecterV2Embedding
+        from literature_ai.core.embeddings.qwen3 import Qwen3Embedding
+        from literature_ai.core.embeddings.bge_m3 import BgeM3Embedding
+        from literature_ai.core.embeddings.nomic import NomicEmbedText
 
         if model in OPENAI_MODELS:
             _MODEL_CACHE[model] = OpenAiEmbedding(model=model)
@@ -75,6 +78,12 @@ def get_embedding_model(model: str) -> EmbeddingModel:
             _MODEL_CACHE[model] = SpecterV2Embedding()
         elif model == "specter_v1":
             _MODEL_CACHE[model] = SpecterV1Embedding()
+        elif model == "qwen3_embedding_4b":
+            _MODEL_CACHE[model] = Qwen3Embedding()
+        elif model == "bge_m3":
+            _MODEL_CACHE[model] = BgeM3Embedding()
+        elif model == "nomic_embed_text":
+            _MODEL_CACHE[model] = NomicEmbedText()
         else:
             raise ValueError(f"Embedding model `{model}` not found.")
     return _MODEL_CACHE[model]

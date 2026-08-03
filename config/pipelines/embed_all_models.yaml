@@ -1,0 +1,29 @@
+# Use with run_pipeline in literature_ai/pipeline/run_pipeline.py
+#
+# Generates abstract embeddings for the existing papers in the database across
+# all five embedding backends. Does NOT collect any new papers.
+
+stages:
+  collect_papers: false
+  clean_paper: false
+  embeddings: true
+
+embeddings:
+  # Precomputed SPECTER v2 vectors pulled from the Semantic Scholar batch API
+  # (operates only over papers already in processed_abstracts; incremental).
+  collect:
+    - specter_v2
+
+  # Generated locally: OpenAI via API, the rest via a local Ollama server.
+  generate:
+    - text-embedding-3-small
+    - qwen3_embedding_4b
+    - bge_m3
+    - nomic_embed_text
+
+  # Automatically create a HNSW index for each model run above
+  create_index: true
+  index:
+    m: 16
+    ef_construction: 64
+    distance: cosine
