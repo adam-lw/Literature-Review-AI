@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -7,12 +8,14 @@ from typing import Literal
 
 if_exists_options = Literal["fail", "replace", "append", "delete_rows"]
 
-# instance initialised in docker - run docker-compose.yml
-PGUSER = "literature_ai"
-PGPASSWORD = "literature_ai"
-PGHOST = "localhost"
-PGPORT = 5433
-PGDATABASE = "literature_ai"
+# Defaults match `docker-compose.yml`'s `postgres` service as published to the host
+# (localhost:5433). Overridable via env vars so the `api` container in docker-compose can
+# instead reach it at its in-network address (postgres:5432).
+PGUSER = os.environ.get("PGUSER", "literature_ai")
+PGPASSWORD = os.environ.get("PGPASSWORD", "literature_ai")
+PGHOST = os.environ.get("PGHOST", "localhost")
+PGPORT = int(os.environ.get("PGPORT", 5433))
+PGDATABASE = os.environ.get("PGDATABASE", "literature_ai")
 
 ENGINE = create_engine(
     f"postgresql+psycopg2://{PGUSER}:{PGPASSWORD}@{PGHOST}:{PGPORT}/{PGDATABASE}",

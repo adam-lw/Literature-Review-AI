@@ -9,3 +9,43 @@ services:
       - "5433:5432"
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U literature_ai -d literature_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    env_file:
+      - .env
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: literature_ai
+      PGPASSWORD: literature_ai
+      PGDATABASE: literature_ai
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - api_venv:/opt/venv
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_DEV_API_TARGET: http://api:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      - api
+
+volumes:
+  api_venv:
+  frontend_node_modules:
