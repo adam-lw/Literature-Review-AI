@@ -14,13 +14,13 @@ dependencies = [
     "ipykernel>=7.1.0,<8.0.0",
     "requests>=2.32.5,<3.0.0",
     "anthropic>=0.75.0,<0.76.0",
+    "docstring-parser>=0.18.0,<0.19.0",
     "pandas>=2.3.3,<3.0.0",
     "sqlalchemy>=2.0.45,<3.0.0",
     "aiohttp>=3.13.3,<4.0.0",
     "pyyaml>=6.0.3,<7.0.0",
     "loguru>=0.7.3,<0.8.0",
     "psycopg2-binary>=2.9.11,<3.0.0",
-    "torch>=2.11.0,<3.0.0",
     "streamlit>=1.55.0,<2.0.0",
     "pypdf>=5.0.0,<6.0.0",
     "matplotlib>=3.11.0",
@@ -43,8 +43,38 @@ dev = [
     "umap-learn>=0.5.0",
 ]
 
+# torch is split into "cpu" and "cuda" extras (see [tool.uv] below) so the several-GB NVIDIA
+# CUDA toolkit is only pulled in on a machine that can actually use it. Pick one:
+#   uv sync --extra cpu   (default — no GPU, e.g. this project's Docker image / any Mac)
+#   uv sync --extra cuda  (Linux host with a real NVIDIA GPU)
+[project.optional-dependencies]
+cpu = ["torch>=2.11.0,<3.0.0"]
+cuda = ["torch>=2.11.0,<3.0.0"]
+
 [tool.uv]
 package = true
+conflicts = [
+    [
+        { extra = "cpu" },
+        { extra = "cuda" },
+    ],
+]
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", extra = "cpu" },
+    { index = "pytorch-cuda", extra = "cuda" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cuda"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
 
 [build-system]
 requires = ["setuptools>=68"]

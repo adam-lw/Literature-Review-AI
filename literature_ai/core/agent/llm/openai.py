@@ -1,9 +1,14 @@
 from dotenv import load_dotenv
 from literature_ai.core.agent.llm.core import LLM
+from literature_ai.core.agent.llm.messages import Messages
+from literature_ai.core.agent.llm.tool_call import ToolCall
+from literature_ai.core.agent.tools import Tool
+import json
 import os
-from typing import Any, Mapping, cast
+from typing import Any, Mapping, Optional, Union, cast
 
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, omit
+from openai.types.responses import FunctionToolParam
 
 load_dotenv()
 
@@ -24,12 +29,48 @@ class OpenAiLLM(LLM):
                 f"{model} is not a legal OpenAI model. Available models: {OPENAI_MODELS}"
             )
 
-    async def call(self, messages: list[dict[str, str]]) -> str:
-        messages_text = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
+    def format_tools(self, tools: list[Tool]) -> list[FunctionToolParam]:
+        return [
+            {
+                "type": "function",
+                "name": t.name,
+                "description": t.description,
+                "strict": None,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        p["param_name"]: {
+                            "type": p["type"],
+                            "description": p["description"],
+                        }
+                        for p in t.params
+                    },
+                    "required": [p["param_name"] for p in t.params if p["required"]],
+                },
+            }
+            for t in tools
+        ]
+
+    async def call(
+        self, messages: Messages, tools: Optional[list[Tool]] = None
+    ) -> Union[str, list[ToolCall]]:
+        messages_text = "\n".join(f"{m.role}: {m.content}" for m in messages)
 
         config = cast(Mapping[str, Any], self.config)
 
         response = await self.client.responses.create(
-            model=self.model, input=messages_text, **config
+            model=self.model,
+            input=messages_text,
+            tools=self.format_tools(tools) if tools else omit,
+            **config,
         )
+
+        tool_calls = [
+            ToolCall(id=item.call_id, name=item.name, arguments=json.loads(item.arguments))
+            for item in response.output
+            if item.type == "function_call"
+        ]
+        if tool_calls:
+            return tool_calls
+
         return response.output_text

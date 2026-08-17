@@ -3,7 +3,7 @@ import IncludeCheckbox from './IncludeCheckbox.jsx'
 
 const METRIC_LABEL = { cosine: 'cos', l2: 'l2', ip: 'ip' }
 
-export default function PaperCard({ result, onToggleInclude, alsoInTerms }) {
+export default function PaperCard({ result, onToggleInclude, alsoInTerms, agentAssessment }) {
   const [expanded, setExpanded] = useState(false)
   const metricLabel = METRIC_LABEL[result.distance_type] || result.distance_type || 'dist'
 
@@ -36,6 +36,12 @@ export default function PaperCard({ result, onToggleInclude, alsoInTerms }) {
 
       {expanded && (
         <div className="paper-card-details">
+          {agentAssessment && (
+            <div className={`agent-assessment agent-assessment-${agentAssessment.verdict}`}>
+              <span className="agent-assessment-verdict">{agentAssessment.verdict}</span>
+              <p className="agent-assessment-note">{agentAssessment.note}</p>
+            </div>
+          )}
           <p className="paper-abstract">{result.abstract || 'No abstract available.'}</p>
           <div className="paper-links">
             <a

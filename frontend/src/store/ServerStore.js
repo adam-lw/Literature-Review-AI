@@ -2,10 +2,10 @@ import { apiClient } from '../api/client.js'
 
 // Normalises a server ProjectOut/ProjectSummaryOut into the shape shared by both stores.
 // The backend never returns a `mode` field (see literature_ai/app/api/models.py) — every
-// project reachable through this store was created via the HITL flow, since the agent flow's
-// submit button never fires a request, so 'hitl' is a safe constant here rather than a guess.
+// project reachable through this store was created via the manual flow, since agent projects
+// live in AgentLocalStore instead, so 'manual' is a safe constant here rather than a guess.
 function normaliseProject(p) {
-  return { ...p, mode: 'hitl' }
+  return { ...p, mode: 'manual' }
 }
 
 export const ServerStore = {

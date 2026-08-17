@@ -14,24 +14,35 @@ function relativeDate(iso) {
 }
 
 export default function ProjectSidebar() {
-  const { projects, projectsLoading, projectsError, deleteProject, isDemoMode } = useProjects()
+  const { projects, projectsLoading, projectsError, deleteProject, deleteAgentProject, isDemoMode } =
+    useProjects()
   const navigate = useNavigate()
   const location = useLocation()
   const { id: activeId } = useParams()
-  const currentMode = location.pathname.startsWith('/new/agent') ? 'agent' : 'hitl'
+  const currentMode =
+    location.pathname.startsWith('/new/agent') || location.pathname.startsWith('/agent-projects')
+      ? 'agent'
+      : 'manual'
 
-  const handleDelete = async (event, projectId) => {
+  const projectPath = (project) =>
+    project.mode === 'agent' ? `/agent-projects/${project.project_id}` : `/projects/${project.project_id}`
+
+  const handleDelete = async (event, project) => {
     event.stopPropagation()
     if (!window.confirm('Delete this project? This cannot be undone.')) return
-    await deleteProject(projectId)
-    if (activeId === projectId) navigate('/new/hitl')
+    if (project.mode === 'agent') {
+      await deleteAgentProject(project.project_id)
+    } else {
+      await deleteProject(project.project_id)
+    }
+    if (activeId === project.project_id) navigate('/new/manual')
   }
 
   return (
     <aside className="project-sidebar">
       {isDemoMode && <DemoBanner />}
       <button type="button" className="new-project-btn" onClick={() => navigate(`/new/${currentMode}`)}>
-        + New
+        + New project
       </button>
 
       {projectsLoading && <p className="sidebar-status">Loading projects…</p>}
@@ -45,23 +56,24 @@ export default function ProjectSidebar() {
           <li
             key={project.project_id}
             className={project.project_id === activeId ? 'active' : ''}
-            onClick={() => navigate(`/projects/${project.project_id}`)}
+            onClick={() => navigate(projectPath(project))}
           >
             <div className="project-list-row">
               <span className="project-title">{project.project_title}</span>
               <span className={`mode-badge mode-${project.mode}`}>
-                {project.mode === 'agent' ? 'Agent' : 'HITL'}
+                {project.mode === 'agent' ? 'Agent' : 'Manual'}
               </span>
             </div>
             <div className="project-meta">
-              {relativeDate(project.created_at)} · {project.search_count} searches ·{' '}
-              {project.paper_count} papers · {project.included_count} included
+              {relativeDate(project.created_at)}
+              {project.mode !== 'agent' &&
+                ` · ${project.search_count} searches · ${project.paper_count} papers · ${project.included_count} included`}
             </div>
             <button
               type="button"
               className="delete-project-btn"
               title="Delete project"
-              onClick={(e) => handleDelete(e, project.project_id)}
+              onClick={(e) => handleDelete(e, project)}
             >
               ×
             </button>

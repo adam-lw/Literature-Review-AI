@@ -5,7 +5,7 @@ import QueryListInput from '../components/QueryListInput.jsx'
 import EmbeddingRunSelect from '../components/EmbeddingRunSelect.jsx'
 import CriteriaEditor from '../components/CriteriaEditor.jsx'
 
-export default function HitlLandingPage() {
+export default function ManualLandingPage() {
   const navigate = useNavigate()
   const { createProject } = useProjects()
   const [queries, setQueries] = useState([''])
@@ -39,15 +39,22 @@ export default function HitlLandingPage() {
 
   return (
     <div className="landing-page">
-      <h1>Start a new human-in-the-loop search</h1>
-      <form onSubmit={handleSubmit} className="hitl-form">
+      <div className="landing-hero">
+        <h1>Start a new literature search</h1>
+        <p className="landing-subtitle">
+          Enter one or more search terms and we'll retrieve candidate papers for you to review, expand,
+          and select for inclusion.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="manual-form">
         <label className="field-label">Search terms</label>
         <QueryListInput onChange={setQueries} />
 
-        <label className="field-label">Embedding run</label>
+        <label className="field-label">Search model</label>
         <EmbeddingRunSelect value={embeddingRunId} onChange={setEmbeddingRunId} />
 
-        <label className="field-label">Inclusion / exclusion criteria</label>
+        <label className="field-label">Inclusion / exclusion criteria (optional)</label>
         <CriteriaEditor value={criteria} onChange={setCriteria} />
 
         <label className="field-label">Results per term</label>
@@ -63,7 +70,7 @@ export default function HitlLandingPage() {
         {error && <p className="form-error">{error}</p>}
 
         <button type="submit" className="submit-btn" disabled={!canSubmit}>
-          {submitting ? 'Searching…' : 'Create project'}
+          {submitting ? 'Searching…' : 'Start project'}
         </button>
       </form>
     </div>

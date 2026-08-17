@@ -1,7 +1,14 @@
 import { useState } from 'react'
 import PaperCard from './PaperCard.jsx'
 
-export default function SearchTermGroup({ search, dedupeCounts, onToggleInclude, onSetAll, onRemoveTerm }) {
+export default function SearchTermGroup({
+  search,
+  dedupeCounts,
+  onToggleInclude,
+  onSetAll,
+  onRemoveTerm,
+  agentAssessments,
+}) {
   const [collapsed, setCollapsed] = useState(false)
   const includedCount = search.results.filter((r) => r.included).length
 
@@ -40,6 +47,7 @@ export default function SearchTermGroup({ search, dedupeCounts, onToggleInclude,
               result={result}
               onToggleInclude={onToggleInclude}
               alsoInTerms={(dedupeCounts[result.paper_id] || 1) - 1}
+              agentAssessment={agentAssessments?.[result.result_id]}
             />
           ))}
           {search.results.length === 0 && <li className="empty-group">No results for this term.</li>}

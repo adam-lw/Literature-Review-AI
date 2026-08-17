@@ -7,7 +7,9 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <span className="app-name">Literature AI</span>
+        <span className="app-name">
+          <span className="app-name-mark">◈</span> Literature AI
+        </span>
         <ModeToggle />
         <ThemeToggle />
       </header>

@@ -43,3 +43,35 @@ class EmbeddingRun(BaseModel):
 
 class EmbeddingModelsResponse(BaseModel):
     runs: list[EmbeddingRun]
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class PaperMetadata(BaseModel):
+    paperId: str
+    title: Optional[str] = None
+    abstract: Optional[str] = None
+    year: Optional[int] = None
+    venue: Optional[str] = None
+    citationCount: Optional[int] = None
+    url: Optional[str] = None
+    DOI: Optional[str] = None
+
+
+class PaperList(BaseModel):
+    name: str
+    papers: list[PaperMetadata]
+
+
+class InvokeAgentRequest(BaseModel):
+    messages: list[ChatMessage] = Field(..., min_length=1)
+    # Paper lists referenced by `messages` (e.g. via an id/tag in message
+    # content). Accepted but not yet processed or injected into context.
+    paper_lists: Optional[list[PaperList]] = None
+
+
+class InvokeAgentResponse(BaseModel):
+    response: str

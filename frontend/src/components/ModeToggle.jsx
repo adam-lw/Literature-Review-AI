@@ -1,30 +1,43 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useWorkspaceMode } from '../context/WorkspaceModeContext.jsx'
 
 export default function ModeToggle() {
   const location = useLocation()
   const navigate = useNavigate()
-  const mode = location.pathname.startsWith('/new/agent') ? 'agent' : 'hitl'
+  const { workspaceMode, setWorkspaceMode } = useWorkspaceMode()
+
+  const inWorkspace = workspaceMode != null
+  const mode = inWorkspace ? workspaceMode : location.pathname.startsWith('/new/agent') ? 'agent' : 'manual'
+
+  const toggle = () => {
+    const next = mode === 'manual' ? 'agent' : 'manual'
+    if (inWorkspace) {
+      setWorkspaceMode(next)
+    } else {
+      navigate(`/new/${next}`)
+    }
+  }
 
   return (
-    <div className="mode-toggle" role="tablist" aria-label="Search mode">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === 'hitl'}
-        className={mode === 'hitl' ? 'active' : ''}
-        onClick={() => navigate('/new/hitl')}
+    <div className="mode-slider" title="Switch between manual and agent mode">
+      <span className={`mode-slider-label ${mode === 'manual' ? 'active' : ''}`}>Manual</span>
+      <span
+        className="mode-slider-track"
+        role="switch"
+        aria-checked={mode === 'agent'}
+        aria-label="Switch between manual and agent mode"
+        tabIndex={0}
+        onClick={toggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            toggle()
+          }
+        }}
       >
-        Human-in-the-loop
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={mode === 'agent'}
-        className={mode === 'agent' ? 'active' : ''}
-        onClick={() => navigate('/new/agent')}
-      >
-        Agent
-      </button>
+        <span className={`mode-slider-thumb ${mode === 'agent' ? 'right' : ''}`} />
+      </span>
+      <span className={`mode-slider-label ${mode === 'agent' ? 'active' : ''}`}>Agent</span>
     </div>
   )
 }

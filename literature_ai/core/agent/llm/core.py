@@ -1,8 +1,12 @@
 from abc import ABC, abstractmethod
 import os
-from typing import Optional
+from typing import Any, Optional, Union
 from pydantic import BaseModel
 import asyncio
+
+from literature_ai.core.agent.llm.messages import Messages
+from literature_ai.core.agent.llm.tool_call import ToolCall
+from literature_ai.core.agent.tools import Tool
 
 
 class LLM(ABC):
@@ -14,13 +18,27 @@ class LLM(ABC):
         pass
 
     @abstractmethod
-    async def call(self, messages: list[dict[str, str]]) -> str:
-        """Abstract method for calling an LLM"""
+    async def call(
+        self, messages: Messages, tools: Optional[list[Tool]] = None
+    ) -> Union[str, list[ToolCall]]:
+        """
+        Abstract method for calling an LLM.
+
+        Returns the model's text response, or a list of `ToolCall`s if the
+        model chose to call one or more of the supplied `tools` instead.
+        """
         ...
 
-    def call_sync(self, messages: list[dict[str, str]]) -> str:
+    @abstractmethod
+    def format_tools(self, tools: list[Tool]) -> Any:
+        """Translates `Tool` objects into this provider's tool-call schema."""
+        ...
+
+    def call_sync(
+        self, messages: Messages, tools: Optional[list[Tool]] = None
+    ) -> Union[str, list[ToolCall]]:
         """Helper method for synchronous calling of `call`"""
-        return asyncio.run(self.call(messages))
+        return asyncio.run(self.call(messages, tools=tools))
 
 
 def get_llm(model: str, parser: Optional[BaseModel] = None) -> LLM:

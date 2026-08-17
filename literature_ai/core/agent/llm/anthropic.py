@@ -1,7 +1,10 @@
 from literature_ai.core.agent.llm import LLM
-from typing import Any, cast
-from anthropic import AsyncAnthropic
-from anthropic.types import MessageParam, TextBlock
+from literature_ai.core.agent.llm.messages import Messages
+from literature_ai.core.agent.llm.tool_call import ToolCall
+from literature_ai.core.agent.tools import Tool
+from typing import Any, Optional, Union, cast
+from anthropic import AsyncAnthropic, omit
+from anthropic.types import MessageParam, TextBlock, ToolParam, ToolUseBlock
 import os
 
 ANTHROPIC_MODELS = ["claude-3-5-haiku-20241022", "claude-sonnet-4-5-20250929"]
@@ -24,14 +27,45 @@ class AnthropicLLM(LLM):
                 f"{model} is not a legal Anthropic model. Available models: {ANTHROPIC_MODELS}"
             )
 
-    async def call(self, messages: list[dict[str, str]]) -> str:
-        anthropic_messages = cast(list[MessageParam], messages)
+    def format_tools(self, tools: list[Tool]) -> list[ToolParam]:
+        return [
+            {
+                "name": t.name,
+                "description": t.description,
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        p["param_name"]: {
+                            "type": p["type"],
+                            "description": p["description"],
+                        }
+                        for p in t.params
+                    },
+                    "required": [p["param_name"] for p in t.params if p["required"]],
+                },
+            }
+            for t in tools
+        ]
+
+    async def call(
+        self, messages: Messages, tools: Optional[list[Tool]] = None
+    ) -> Union[str, list[ToolCall]]:
+        anthropic_messages = cast(list[MessageParam], messages.to_list())
 
         response = await self.client.messages.create(
             max_tokens=1024,
             messages=anthropic_messages,
             model=self.model,
+            tools=self.format_tools(tools) if tools else omit,
         )
+
+        tool_calls = [
+            ToolCall(id=block.id, name=block.name, arguments=cast(dict[str, Any], block.input))
+            for block in response.content
+            if isinstance(block, ToolUseBlock)
+        ]
+        if tool_calls:
+            return tool_calls
 
         # Extract text safely
         for block in response.content:

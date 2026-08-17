@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useReducer } from 'react'
 import { store, isDemoMode } from '../store/index.js'
+import { AgentLocalStore } from '../store/AgentLocalStore.js'
 
 const ProjectsContext = createContext(null)
 
@@ -37,7 +38,13 @@ export function ProjectsProvider({ children }) {
   const refreshProjects = useCallback(async () => {
     dispatch({ type: 'projects/loading' })
     try {
-      const projects = await store.listProjects()
+      const [serverProjects, agentProjects] = await Promise.all([
+        store.listProjects(),
+        Promise.resolve(AgentLocalStore.listProjects()),
+      ])
+      const projects = [...serverProjects, ...agentProjects].sort(
+        (a, b) => new Date(b.created_at) - new Date(a.created_at),
+      )
       dispatch({ type: 'projects/loaded', projects })
     } catch (error) {
       dispatch({ type: 'projects/error', error: error.message })
@@ -76,6 +83,32 @@ export function ProjectsProvider({ children }) {
     [refreshProjects],
   )
 
+  const createAgentProject = useCallback(
+    async (payload) => {
+      const project = AgentLocalStore.createProject(payload)
+      await refreshProjects()
+      return project
+    },
+    [refreshProjects],
+  )
+
+  const updateAgentProject = useCallback(
+    async (id, patch) => {
+      const project = AgentLocalStore.updateProject(id, patch)
+      refreshProjects()
+      return project
+    },
+    [refreshProjects],
+  )
+
+  const deleteAgentProject = useCallback(
+    async (id) => {
+      AgentLocalStore.deleteProject(id)
+      await refreshProjects()
+    },
+    [refreshProjects],
+  )
+
   const value = {
     ...state,
     isDemoMode,
@@ -84,6 +117,10 @@ export function ProjectsProvider({ children }) {
     refreshEmbeddingRuns,
     createProject,
     deleteProject,
+    createAgentProject,
+    updateAgentProject,
+    deleteAgentProject,
+    getAgentProject: AgentLocalStore.getProject,
   }
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>

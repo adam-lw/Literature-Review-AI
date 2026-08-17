@@ -72,7 +72,7 @@ export const SessionStore = {
       project_title: placeholderProjectTitle(),
       description: null,
       inclusion_criteria: inclusion_criteria ?? null,
-      mode: 'hitl',
+      mode: 'manual',
       embedding_run_id,
       created_at: now,
       updated_at: now,
