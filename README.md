@@ -1,25 +1,54 @@
-# (WIP) Papery : Agent-driven Literature Reviews
+# (WIP) Agent-driven Systematic Reviews
 [![CI](https://img.shields.io/github/actions/workflow/status/adam-lw/Literature-Review-AI/.github/workflows/ci.yml)](https://github.com/adam-lw/Literature-Review-AI/actions)
 
-- [(WIP) Papery : Agent-driven Literature Reviews](#wip-papery--agent-driven-literature-reviews)
+- [(WIP) Agent-driven Systematic Reviews](#wip-papery--agent-driven-literature-reviews)
   - [Description](#description)
   - [Background](#background)
   - [Technical Description](#technical-description)
     - [Application Design](#application-design)
     - [Preliminary Data Collection](#preliminary-data-collection)
     - [Agentic Paper Writing](#agentic-paper-writing)
+   
+
+**Please check the `dev` branch for the latest changes!**
 
 ## Description
 
-*Papery* is an agent-powered tool for the automated writing of literature review, meta-analysis and systematic review papers. 
+This project is an attempt to produce a fully end-to-end agentic approach to systematic review synthesis, while ensuring full human-in-the-loop visibility, and detailed logging & traceability to ensure confidence in the outputted results. It covers all steps in an end-to-end pipeline, from defining the bounds of the research & research questions, through to paper discovery, paper inclusion/exclusion assessment, and paper synthesis & validation.
 
-The project was started with two goals: to be able to replicate existing literature review papers, and to produce new literature reviews from scratch. Manually producing these papers is typically repetitive and time-intensive, diverting researchers' time and effort away from potentially more productive activities in their research. Therefore, this project aims to automate, or significantly accelerate, this task.
+The project was initially started with the goal of accurately and reliably synthesising literature reviews across any domain of research. This isn't a new goal - many AI research tools already exist like [Gemini Notebook](https://notebook.google) (formerly NotebookLM) by Google, or integrated AI tools in existing research apps like [Mendeley](https://www.mendeley.com/features#ai) - yet these tools often share one key weakness in common: their tools are not transparent, they are not reproducible, and often rely on manual intervention to do a lot of the heavy lifting during the production of the review. In particular, the transparency and reproducibility are critical when producing systematic reviews, which must clearly document their discovery approaches, inclusion/exclusion criteria, and reasoning.
 
-The tool leverages a hybrid keyword & semantic search for paper retrieval, AI-as-a-Judge & heuristic-based ranking for paper selection, and an agent-driven architecture for paper writing & assessment. The codebase is designed to be deployable in Docker/Kubernetes and will provide an API via FastAPI.
+The project implements a full microservice architecture via Docker, including a stateless agent/LLM service, a RAG/paper storing service, an application layer for managing user projects, batch pipelines, a GROBID PDF parsing container, and a PostgreSQL + pgvector container for hosting the database. It heavily relies on OOP to ensure flexibility and maintainability, including easily extendible LLM/embeddings interfaces to allow for seamless integration of new models.
 
-Particular care has been taken to ensure that results are accurate and reproducable. Effective evaluation and observability measures are essential in ensuring that users trust the outputs of the tool, especially given AI's known ability to "hallucinate" and produce inconsistent outputs. A combination of quantitative and qualitative evaluation approaches have been selected, including precision and recall for paper retrieval against benchmark papers, perplexity for textual outputs, AI-as-a-Judge assessment, and manual human review.
+### Functionality Progress
+The project is currently WIP - below is a summary of the completed functionality, as included in the `dev` branch.
 
-The project is currently WIP.
+🟢 Data Collection & Processing - Complete
+  - Implemented pipeline for collecting bulk dataset for searching over, collected from Semantic Scholar's bulk API.
+
+🟢 Semantic Search - Complete
+  - Includes 5 optional embedding approaches and a full embedding comparison pipeline. Users can choose between the available embedding models in the UI.
+
+🟢 Application Layer & UI - Complete
+  - UI powered by React / Vite.js - offers an optional manual mode, and a stepwise agentic mode to allow users control over the search process and inclusion/exclusion criteria application.
+  - Application layer persists user "projects", interfaces with a stateless agent service and the paper/RAG service.
+
+🟢 LLM Backend & Logging
+  - Integrates with Langfuse to provide trace logging.
+
+🟢 Project Scoping Agent - Complete
+  - Agent to work with the user to iteratively define the bounds & criteria for the 
+
+🟢 Chatbot Agent - v1 Complete
+  - Allows users to ask FAQs, query the paper findings, produce summarisations and other similar functionality.
+
+🟡 Inclusion / Exclusion Criteria Assessment Agent - WIP
+
+🟡 Paper Writing Agent - WIP
+
+🔴 Keyword & Hybrid Searches - Not yet implemented
+
+
 
 ## Background
 
@@ -50,12 +79,4 @@ The title and abstract from each paper are then used to generate text embeddings
 The reasoning behind this overall approach is partially down to several technical limitations. Firstly, there is an extremely large number of research papers - over 200 million - which obviously poses a technical limitation on the volume of papers that can be processed due to hardware & storage limitations. This has required me to significantly subset the overall search space by caching papers by topic, which may unintentionally exclude papers from a search. Secondly, semantic search begins to break down after the number of embeddings exceeds a certain point (~10^7) due to vector crowding, which forces the use of title and abstract embeddings only, rather than a full paper chunking approach.
 
 To allow AI agents to collect papers in parallel without exceeding the API's rate limits, I have implemented a dispatcher/consumer architecture with asyncio which automatically manages concurrent requests from multiple agents, while exposing an easily configurable config for managing APIs. This is made available via a helper function, `call_api`.
-
-
-### Agentic Paper Writing
-
-The system uses a combination of a hard-coded rules-based DAG with an agentic architecture, coded fully from scratch in Python. Agents are allowed to call a limited set of tools, dictated by the controller, with tool calls potentially invoking further sub-agents and hard coded validation steps. Agents are implemented with a ReAct-like architecture (reflect, plan, act, repeat), using context summarisation to compress context and improve agent reliability.
-
-RAG is used for paper synthesis, using a vector search across the retrieved papers. The papers were split into chunks, prepended with context about the paper itself, and encoded using an embedding model. 
-
 
