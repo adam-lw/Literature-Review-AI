@@ -749,6 +749,40 @@ a {
   accent-color: var(--accent);
 }
 
+/* Agent question */
+
+.agent-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.agent-question-description {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.agent-question-freetext {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.agent-question-freetext input {
+  flex: 1;
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-4);
+}
+
+.agent-question-freetext button {
+  background: var(--accent);
+  color: var(--accent-text);
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 600;
+}
+
 /* Agent assessment */
 
 .agent-assessment {

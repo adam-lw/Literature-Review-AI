@@ -2,16 +2,15 @@ import { useCallback, useEffect, useLayoutEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useProjects } from '../context/ProjectsContext.jsx'
 import { useWorkspaceMode } from '../context/WorkspaceModeContext.jsx'
-import ResultsPanel from '../components/ResultsPanel.jsx'
 import ChatTurn from '../components/chat/ChatTurn.jsx'
 import ActionBar from '../components/chat/ActionBar.jsx'
 import ChatComposer from '../components/chat/ChatComposer.jsx'
-import FormatQuestionnaire from '../components/chat/FormatQuestionnaire.jsx'
 import PlaceholderNotice from '../components/chat/PlaceholderNotice.jsx'
 import AgentStepPrompt from '../components/chat/AgentStepPrompt.jsx'
 import AgentContinueBar from '../components/chat/AgentContinueBar.jsx'
-import { useAgentStepFlow } from '../components/chat/useAgentStepFlow.js'
-import { useChatAgent } from '../components/chat/useChatAgent.js'
+import AgentQuestion from '../components/chat/AgentQuestion.jsx'
+import { AGENT_PHASES, useAgentPhaseFlow } from '../components/chat/useAgentPhaseFlow.js'
+import { useAgentConversation } from '../components/chat/useAgentConversation.js'
 
 export default function AgentProjectWorkspace() {
   const { id } = useParams()
@@ -22,10 +21,14 @@ export default function AgentProjectWorkspace() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [conversation, setConversation] = useState([])
   const [chatOpen, setChatOpen] = useState(false)
-  const [formatPrefs, setFormatPrefs] = useState(null)
+  const [phaseStarted, setPhaseStarted] = useState(false)
 
-  const agentFlow = useAgentStepFlow(workspaceMode === 'agent')
-  const chatAgent = useChatAgent()
+  const agentFlow = useAgentPhaseFlow(workspaceMode === 'agent')
+  // One phase = one agent conversation: `phaseAgent` is reset (fresh create_agent call) every
+  // time `agentFlow` advances to a new phase. `chatAgent` is the separate freeform "chatbot"
+  // conversation opened from manual mode's action bar.
+  const phaseAgent = useAgentConversation()
+  const chatAgent = useAgentConversation()
 
   // This project defaults to Agent mode every time it's (re-)opened; the slider can flip
   // it to Manual mode from here on, live, for the rest of this visit.
@@ -41,7 +44,10 @@ export default function AgentProjectWorkspace() {
     setTitleDraft(p?.project_title ?? '')
     setConversation([])
     setChatOpen(false)
-    setFormatPrefs(null)
+    setPhaseStarted(false)
+    phaseAgent.reset()
+    chatAgent.reset()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, getAgentProject])
 
   const commitTitle = async () => {
@@ -59,43 +65,42 @@ export default function AgentProjectWorkspace() {
     setConversation((prev) => [...prev, { id: crypto.randomUUID(), role, node }])
   }, [])
 
-  const handleAgentStepConfirm = () => {
-    const { step } = agentFlow
-    if (step.kind === 'notice') {
-      const detail =
-        step.key === 'writing' && formatPrefs
-          ? `The writing agent will draft a review formatted in ${formatPrefs.citationStyle} style, covering: ${formatPrefs.sections.join(', ')}, once paper collection and evaluation are implemented.`
-          : step.detail
-      appendTurn('assistant', <PlaceholderNotice feature={step.feature} detail={detail} />)
-    } else if (step.kind === 'evaluate') {
-      appendTurn(
-        'assistant',
-        <div>
-          <p className="turn-lede">Agent evaluation</p>
-          <ResultsPanel
-            searches={[]}
-            dedupeCounts={{}}
-            onToggleInclude={() => {}}
-            onSetAll={() => {}}
-            onRemoveTerm={() => {}}
-            emptyTitle="No papers collected yet"
-            emptyDescription="Once paper collection is implemented, results will appear here grouped by generated search term — each with a brief agent summary and an inclusion/exclusion verdict against your criteria in the expanded view."
-          />
-        </div>,
-      )
+  // Renders one phase agent's response as a transcript turn: its text on "completed"/"error",
+  // or just the question text on "awaiting_input" (the interactive answer UI itself lives in
+  // `renderAgentBottom`, not the transcript).
+  const appendPhaseResult = (result) => {
+    if (!result.ok) {
+      appendTurn('assistant', <p className="chat-error-text">{result.error}</p>)
+      return
     }
-    agentFlow.confirm()
+    const { response } = result
+    appendTurn('assistant', <p>{response.status === 'awaiting_input' ? response.question.question : response.response}</p>)
   }
 
-  const handleAgentFormatSubmit = ({ citationStyle, sections }) => {
-    setFormatPrefs({ citationStyle, sections })
-    appendTurn(
-      'user',
-      <p>
-        {citationStyle} format, sections: {sections.join(', ')}.
-      </p>,
+  const handleStartPhase = async () => {
+    setPhaseStarted(true)
+    const result = await phaseAgent.start(
+      agentFlow.phase.stage,
+      project.description,
+      undefined,
+      project.inclusion_criteria,
     )
-    agentFlow.confirm()
+    appendPhaseResult(result)
+  }
+
+  const handlePhaseMessage = async (text) => {
+    appendTurn('user', <p>{text}</p>)
+    appendPhaseResult(await phaseAgent.send(text))
+  }
+
+  const handleContinuePhase = () => {
+    // Keep the last phase's conversation alive once done, so "Chat with AI" from the done
+    // state can still discuss its output; every other phase transition starts fresh.
+    if (agentFlow.phaseIndex < AGENT_PHASES.length - 1) {
+      phaseAgent.reset()
+      setPhaseStarted(false)
+    }
+    agentFlow.advance()
   }
 
   const handleManualAction = (key) => {
@@ -119,43 +124,57 @@ export default function AgentProjectWorkspace() {
     )
   }
 
+  // In manual mode this talks to the standalone "chatbot" agent; in agent mode it's a follow-up
+  // turn in the current phase's own conversation, same as answering a question would be.
   const handleChatSend = async (text) => {
+    if (workspaceMode === 'agent') return handlePhaseMessage(text)
+
     appendTurn('user', <p>{text}</p>)
-    const result = await chatAgent.sendMessage(text)
+    const result =
+      chatAgent.status === null ? await chatAgent.start('chatbot', text) : await chatAgent.send(text)
     if (result.ok) {
-      appendTurn('assistant', <p>{result.response}</p>)
+      appendTurn('assistant', <p>{result.response.response}</p>)
     } else {
       appendTurn('assistant', <p className="chat-error-text">{result.error}</p>)
     }
   }
 
   const renderAgentBottom = () => {
-    const { step, phase } = agentFlow
-
-    if (phase === 'confirm') {
-      if (step.kind === 'questionnaire') {
-        return (
-          <ChatTurn role="assistant" wide>
-            <p className="chat-turn-label">Agent's next step</p>
-            <p>{step.description}</p>
-            <FormatQuestionnaire onSubmit={handleAgentFormatSubmit} submitLabel="Confirm" />
-          </ChatTurn>
-        )
-      }
+    if (phaseAgent.sending) {
       return (
         <ChatTurn role="assistant" wide>
-          <AgentStepPrompt description={step.description} onConfirm={handleAgentStepConfirm} />
+          <p className="chat-thinking">Thinking…</p>
+        </ChatTurn>
+      )
+    }
+
+    if (agentFlow.done) {
+      return (
+        <ChatTurn role="assistant" wide>
+          <AgentContinueBar showContinue={false} onChat={() => setChatOpen(true)} />
+        </ChatTurn>
+      )
+    }
+
+    if (!phaseStarted) {
+      return (
+        <ChatTurn role="assistant" wide>
+          <AgentStepPrompt description={agentFlow.phase.description} onConfirm={handleStartPhase} />
+        </ChatTurn>
+      )
+    }
+
+    if (phaseAgent.question) {
+      return (
+        <ChatTurn role="assistant" wide>
+          <AgentQuestion question={phaseAgent.question} onAnswer={handlePhaseMessage} />
         </ChatTurn>
       )
     }
 
     return (
       <ChatTurn role="assistant" wide>
-        <AgentContinueBar
-          showContinue={phase !== 'done'}
-          onContinue={agentFlow.continueNext}
-          onChat={() => setChatOpen(true)}
-        />
+        <AgentContinueBar onContinue={handleContinuePhase} onChat={() => setChatOpen(true)} />
       </ChatTurn>
     )
   }
@@ -221,7 +240,7 @@ export default function AgentProjectWorkspace() {
       {chatOpen && (
         <ChatComposer
           onSend={handleChatSend}
-          disabled={chatAgent.sending}
+          disabled={workspaceMode === 'agent' ? phaseAgent.sending : chatAgent.sending}
           placeholder="Ask the agent a question…"
         />
       )}
