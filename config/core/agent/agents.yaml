@@ -1,7 +1,10 @@
 # Legal agent names for spawn_agent.
 #
 # Each entry here must have a correspondingly named prompt file at
-# config/core/agent/prompts/<name>.md — that file supplies the agent's
-# role-specific instructions.
+# config/core/agent/prompts/agent_types/<name>.md — that file supplies the
+# agent's role-specific instructions.
 - chatbot
 - orchestrator
+- scoping
+- search_review
+- writing
