@@ -102,12 +102,14 @@ def collect_full_papers(
     for paper_id, pdf_url in to_process.items():
         text = _download_and_extract(pdf_url)
         if text is not None:
-            batch.append({
-                "paperId": paper_id,
-                "full_text": text,
-                "pdf_url": pdf_url,
-                "collected_at": datetime.now(timezone.utc),
-            })
+            batch.append(
+                {
+                    "paperId": paper_id,
+                    "full_text": text,
+                    "pdf_url": pdf_url,
+                    "collected_at": datetime.now(timezone.utc),
+                }
+            )
             metrics.inserted += 1
         else:
             metrics.errors += 1
@@ -115,13 +117,19 @@ def collect_full_papers(
         processed += 1
 
         if len(batch) >= _BATCH_SIZE:
-            upsert_table(batch, output_table, conflict_cols=["paperId"], do_update=False)
-            logger.info(f"Upserted {len(batch)} papers ({processed}/{len(to_process)} processed)")
+            upsert_table(
+                batch, output_table, conflict_cols=["paperId"], do_update=False
+            )
+            logger.info(
+                f"Upserted {len(batch)} papers ({processed}/{len(to_process)} processed)"
+            )
             batch = []
 
     if batch:
         upsert_table(batch, output_table, conflict_cols=["paperId"], do_update=False)
-        logger.info(f"Upserted {len(batch)} papers ({processed}/{len(to_process)} processed)")
+        logger.info(
+            f"Upserted {len(batch)} papers ({processed}/{len(to_process)} processed)"
+        )
 
     logger.info(
         f"collect_full_papers complete — inserted: {metrics.inserted}, "

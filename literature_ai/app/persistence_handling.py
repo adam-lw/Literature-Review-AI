@@ -54,26 +54,38 @@ def create_project(
     from literature_ai.search_service.search.vector_search import vector_search
 
     with ENGINE.connect() as conn:
-        run_row = conn.execute(
-            text("SELECT run_id FROM processed.embedding_runs_metadata WHERE run_id = :run_id"),
-            {"run_id": embedding_run_id},
-        ).mappings().first()
+        run_row = (
+            conn.execute(
+                text(
+                    "SELECT run_id FROM processed.embedding_runs_metadata WHERE run_id = :run_id"
+                ),
+                {"run_id": embedding_run_id},
+            )
+            .mappings()
+            .first()
+        )
     if run_row is None:
-        raise ValueError(f"No embedding run found for embedding_run_id={embedding_run_id}")
+        raise ValueError(
+            f"No embedding run found for embedding_run_id={embedding_run_id}"
+        )
 
     with ENGINE.begin() as conn:
-        row = conn.execute(
-            text("""
+        row = (
+            conn.execute(
+                text("""
                 INSERT INTO app.projects (project_title, inclusion_criteria, embedding_run_id)
                 VALUES (:title, :inclusion_criteria, :embedding_run_id)
                 RETURNING project_id
             """),
-            {
-                "title": placeholder_project_title(),
-                "inclusion_criteria": inclusion_criteria,
-                "embedding_run_id": embedding_run_id,
-            },
-        ).mappings().one()
+                {
+                    "title": placeholder_project_title(),
+                    "inclusion_criteria": inclusion_criteria,
+                    "embedding_run_id": embedding_run_id,
+                },
+            )
+            .mappings()
+            .one()
+        )
     project_id = str(row["project_id"])
 
     seen: set[str] = set()
@@ -83,7 +95,9 @@ def create_project(
             continue
         seen.add(query)
         search = create_search(project_id, query, n_results)
-        results = vector_search(query=query, run_id=embedding_run_id, n_results=n_results)
+        results = vector_search(
+            query=query, run_id=embedding_run_id, n_results=n_results
+        )
         save_search_results(str(search["search_id"]), results)
 
     project = get_project(project_id)
@@ -93,28 +107,37 @@ def create_project(
 
 def get_project(project_id: str) -> dict[str, Any] | None:
     with ENGINE.connect() as conn:
-        project_row = conn.execute(
-            text("""
+        project_row = (
+            conn.execute(
+                text("""
                 SELECT project_id, project_title, description, inclusion_criteria,
                        embedding_run_id, created_at, updated_at
                 FROM app.projects WHERE project_id = :pid
             """),
-            {"pid": project_id},
-        ).mappings().first()
+                {"pid": project_id},
+            )
+            .mappings()
+            .first()
+        )
         if project_row is None:
             return None
 
-        search_rows = conn.execute(
-            text("""
+        search_rows = (
+            conn.execute(
+                text("""
                 SELECT search_id, project_id, query, n_results, created_at
                 FROM app.searches WHERE project_id = :pid
                 ORDER BY created_at ASC
             """),
-            {"pid": project_id},
-        ).mappings().all()
+                {"pid": project_id},
+            )
+            .mappings()
+            .all()
+        )
 
-        result_rows = conn.execute(
-            text("""
+        result_rows = (
+            conn.execute(
+                text("""
                 SELECT
                     sr.result_id, sr.search_id, sr.paper_id, sr.type, sr.search_rank,
                     sr.distance, sr.distance_type,
@@ -128,8 +151,11 @@ def get_project(project_id: str) -> dict[str, Any] | None:
                 WHERE s.project_id = :pid
                 ORDER BY sr.search_id, sr.search_rank ASC
             """),
-            {"pid": project_id},
-        ).mappings().all()
+                {"pid": project_id},
+            )
+            .mappings()
+            .all()
+        )
 
     results_by_search: dict[str, list[dict[str, Any]]] = {}
     for row in result_rows:
@@ -151,7 +177,9 @@ def update_project(project_id: str, **fields: Any) -> dict[str, Any] | None:
     set_clause = ", ".join(f'"{k}" = :{k}' for k in updates)
     with ENGINE.begin() as conn:
         conn.execute(
-            text(f'UPDATE app.projects SET {set_clause}, "updated_at" = NOW() WHERE project_id = :pid'),
+            text(
+                f'UPDATE app.projects SET {set_clause}, "updated_at" = NOW() WHERE project_id = :pid'
+            ),
             {**updates, "pid": project_id},
         )
     return get_project(project_id)
@@ -159,38 +187,50 @@ def update_project(project_id: str, **fields: Any) -> dict[str, Any] | None:
 
 def delete_project(project_id: str) -> None:
     with ENGINE.begin() as conn:
-        conn.execute(text("DELETE FROM app.projects WHERE project_id = :pid"), {"pid": project_id})
+        conn.execute(
+            text("DELETE FROM app.projects WHERE project_id = :pid"),
+            {"pid": project_id},
+        )
 
 
 def create_search(project_id: str, query: str, n_results: int = 10) -> dict[str, Any]:
     """Creates (or, on conflict, refreshes n_results on) the app.searches row for this term."""
     with ENGINE.begin() as conn:
-        row = conn.execute(
-            text("""
+        row = (
+            conn.execute(
+                text("""
                 INSERT INTO app.searches (project_id, query, n_results)
                 VALUES (:project_id, :query, :n_results)
                 ON CONFLICT (project_id, query) DO UPDATE SET n_results = EXCLUDED.n_results
                 RETURNING search_id, project_id, query, n_results, created_at
             """),
-            {"project_id": project_id, "query": query, "n_results": n_results},
-        ).mappings().one()
+                {"project_id": project_id, "query": query, "n_results": n_results},
+            )
+            .mappings()
+            .one()
+        )
     return dict(row)
 
 
 def get_search(search_id: str) -> dict[str, Any] | None:
     with ENGINE.connect() as conn:
-        search_row = conn.execute(
-            text("""
+        search_row = (
+            conn.execute(
+                text("""
                 SELECT search_id, project_id, query, n_results, created_at
                 FROM app.searches WHERE search_id = :sid
             """),
-            {"sid": search_id},
-        ).mappings().first()
+                {"sid": search_id},
+            )
+            .mappings()
+            .first()
+        )
         if search_row is None:
             return None
 
-        result_rows = conn.execute(
-            text("""
+        result_rows = (
+            conn.execute(
+                text("""
                 SELECT
                     sr.result_id, sr.search_id, sr.paper_id, sr.type, sr.search_rank,
                     sr.distance, sr.distance_type,
@@ -203,8 +243,11 @@ def get_search(search_id: str) -> dict[str, Any] | None:
                 WHERE sr.search_id = :sid
                 ORDER BY sr.search_rank ASC
             """),
-            {"sid": search_id},
-        ).mappings().all()
+                {"sid": search_id},
+            )
+            .mappings()
+            .all()
+        )
 
     return {**dict(search_row), "results": [dict(row) for row in result_rows]}
 
@@ -212,12 +255,16 @@ def get_search(search_id: str) -> dict[str, Any] | None:
 def delete_search(project_id: str, search_id: str) -> None:
     with ENGINE.begin() as conn:
         conn.execute(
-            text("DELETE FROM app.searches WHERE search_id = :sid AND project_id = :pid"),
+            text(
+                "DELETE FROM app.searches WHERE search_id = :sid AND project_id = :pid"
+            ),
             {"sid": search_id, "pid": project_id},
         )
 
 
-def save_search_results(search_id: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def save_search_results(
+    search_id: str, rows: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     """Upserts vector_search() result rows for a search, ranked by their list order.
 
     Re-running a search updates rank/distance for papers still present rather than resetting
@@ -227,8 +274,9 @@ def save_search_results(search_id: str, rows: list[dict[str, Any]]) -> list[dict
     inserted: list[dict[str, Any]] = []
     with ENGINE.begin() as conn:
         for rank, row in enumerate(rows, start=1):
-            result = conn.execute(
-                text("""
+            result = (
+                conn.execute(
+                    text("""
                     INSERT INTO app.search_results
                         (search_id, paper_id, type, search_rank, distance, distance_type)
                     VALUES (:search_id, :paper_id, 'embedding', :rank, :distance, :distance_type)
@@ -238,14 +286,17 @@ def save_search_results(search_id: str, rows: list[dict[str, Any]]) -> list[dict
                                   distance_type = EXCLUDED.distance_type
                     RETURNING result_id
                 """),
-                {
-                    "search_id": search_id,
-                    "paper_id": row["paperId"],
-                    "rank": rank,
-                    "distance": row.get("distance"),
-                    "distance_type": row.get("distance_type") or "cosine",
-                },
-            ).mappings().one()
+                    {
+                        "search_id": search_id,
+                        "paper_id": row["paperId"],
+                        "rank": rank,
+                        "distance": row.get("distance"),
+                        "distance_type": row.get("distance_type") or "cosine",
+                    },
+                )
+                .mappings()
+                .one()
+            )
             result_id = result["result_id"]
             conn.execute(
                 text("""
@@ -289,13 +340,17 @@ def set_inclusion_bulk(items: list[dict[str, Any]]) -> int:
 
 def list_summarisations(project_id: str) -> list[dict[str, Any]]:
     with ENGINE.connect() as conn:
-        rows = conn.execute(
-            text("""
+        rows = (
+            conn.execute(
+                text("""
                 SELECT summarisation_id, project_id, paper_id, summary, model, created_at
                 FROM app.paper_summarisations
                 WHERE project_id = :pid
                 ORDER BY created_at DESC
             """),
-            {"pid": project_id},
-        ).mappings().all()
+                {"pid": project_id},
+            )
+            .mappings()
+            .all()
+        )
     return [dict(row) for row in rows]

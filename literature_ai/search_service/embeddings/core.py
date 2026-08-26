@@ -67,7 +67,10 @@ _MODEL_CACHE: dict[str, EmbeddingModel] = {}
 
 def get_embedding_model(model: str) -> EmbeddingModel:
     if model not in _MODEL_CACHE:
-        from literature_ai.search_service.embeddings.specter import SpecterV1Embedding, SpecterV2Embedding
+        from literature_ai.search_service.embeddings.specter import (
+            SpecterV1Embedding,
+            SpecterV2Embedding,
+        )
         from literature_ai.search_service.embeddings.qwen3 import Qwen3Embedding
         from literature_ai.search_service.embeddings.bge_m3 import BgeM3Embedding
         from literature_ai.search_service.embeddings.nomic import NomicEmbedText

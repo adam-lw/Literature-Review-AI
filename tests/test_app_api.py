@@ -24,7 +24,9 @@ def _fake_project(project_id: uuid.UUID) -> dict:
     }
 
 
-def _fake_search(project_id: uuid.UUID, search_id: uuid.UUID, result_id: uuid.UUID) -> dict:
+def _fake_search(
+    project_id: uuid.UUID, search_id: uuid.UUID, result_id: uuid.UUID
+) -> dict:
     now = datetime.now(timezone.utc)
     return {
         "search_id": search_id,
@@ -63,18 +65,34 @@ def test_app_api_projects_endpoints(monkeypatch):
     result_id = uuid.uuid4()
 
     with TestClient(app_api.app) as client:
-        monkeypatch.setattr(projects_router.db, "list_projects", lambda: [
-            {**_fake_project(project_id), "search_count": 1, "paper_count": 1, "included_count": 1}
-        ])
+        monkeypatch.setattr(
+            projects_router.db,
+            "list_projects",
+            lambda: [
+                {
+                    **_fake_project(project_id),
+                    "search_count": 1,
+                    "paper_count": 1,
+                    "included_count": 1,
+                }
+            ],
+        )
         response = client.get("/projects")
         assert response.status_code == 200
         assert len(response.json()["projects"]) == 1
 
-        monkeypatch.setattr(projects_router.db, "create_project", lambda **kwargs: _fake_project(project_id))
-        response = client.post("/projects", json={
-            "queries": ["oct computer vision"],
-            "embedding_run_id": 1,
-        })
+        monkeypatch.setattr(
+            projects_router.db,
+            "create_project",
+            lambda **kwargs: _fake_project(project_id),
+        )
+        response = client.post(
+            "/projects",
+            json={
+                "queries": ["oct computer vision"],
+                "embedding_run_id": 1,
+            },
+        )
         assert response.status_code == 200
         assert response.json()["project_id"] == str(project_id)
 
@@ -82,29 +100,48 @@ def test_app_api_projects_endpoints(monkeypatch):
         response = client.get(f"/projects/{project_id}")
         assert response.status_code == 404
 
-        monkeypatch.setattr(projects_router.db, "get_project", lambda pid: _fake_project(project_id))
+        monkeypatch.setattr(
+            projects_router.db, "get_project", lambda pid: _fake_project(project_id)
+        )
         response = client.get(f"/projects/{project_id}")
         assert response.status_code == 200
 
-        monkeypatch.setattr(projects_router.db, "create_search",
-                             lambda pid, query, n_results: {"search_id": search_id})
-        monkeypatch.setattr(projects_router.db, "save_search_results", lambda sid, rows: rows)
-        monkeypatch.setattr(projects_router.db, "get_search",
-                             lambda sid: _fake_search(project_id, search_id, result_id))
-        response = client.post(f"/projects/{project_id}/searches", json={"query": "oct computer vision"})
+        monkeypatch.setattr(
+            projects_router.db,
+            "create_search",
+            lambda pid, query, n_results: {"search_id": search_id},
+        )
+        monkeypatch.setattr(
+            projects_router.db, "save_search_results", lambda sid, rows: rows
+        )
+        monkeypatch.setattr(
+            projects_router.db,
+            "get_search",
+            lambda sid: _fake_search(project_id, search_id, result_id),
+        )
+        response = client.post(
+            f"/projects/{project_id}/searches", json={"query": "oct computer vision"}
+        )
         assert response.status_code == 200
         assert response.json()["search_id"] == str(search_id)
         assert response.json()["results"][0]["included"] is True
 
-        monkeypatch.setattr(projects_router.db, "set_inclusion_bulk", lambda items: len(items))
-        response = client.patch(f"/projects/{project_id}/inclusion", json={
-            "items": [{"result_id": str(result_id), "included": False}]
-        })
+        monkeypatch.setattr(
+            projects_router.db, "set_inclusion_bulk", lambda items: len(items)
+        )
+        response = client.patch(
+            f"/projects/{project_id}/inclusion",
+            json={"items": [{"result_id": str(result_id), "included": False}]},
+        )
         assert response.status_code == 200
         assert response.json()["updated"] == 1
 
-        monkeypatch.setattr(projects_router.db, "set_inclusion", lambda rid, included: None)
-        response = client.patch(f"/results/{result_id}/inclusion", json={"included": False})
+        monkeypatch.setattr(
+            projects_router.db, "set_inclusion", lambda rid, included: None
+        )
+        response = client.patch(
+            f"/results/{result_id}/inclusion", json={"included": False}
+        )
         assert response.status_code == 200
         assert response.json()["included"] is False
 

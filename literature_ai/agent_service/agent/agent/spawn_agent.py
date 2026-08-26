@@ -8,7 +8,11 @@ from literature_ai.agent_service.agent.agent.core.response import AgentResponse
 from literature_ai.agent_service.agent.prompt.prompt import get_prompt, PROMPTS_PATH
 from literature_ai.agent_service.agent.llm.core import get_llm, Messages
 from literature_ai.agent_service.agent.memory import MemoryObject, get_formatted_memory
-from literature_ai.agent_service.agent.tools import Tool, get_all_tools, get_tools_by_name
+from literature_ai.agent_service.agent.tools import (
+    Tool,
+    get_all_tools,
+    get_tools_by_name,
+)
 from literature_ai.agent_service.agent.tools.skills import get_formatted_skills
 from literature_ai.utils import get_project_root
 
@@ -30,7 +34,10 @@ def is_registered_agent(name: str) -> bool:
     correspondingly named prompt file (`<name>.md`) in the
     `prompts/agent_types` directory.
     """
-    return name in get_registered_agents() and (PROMPTS_PATH / "agent_types" / f"{name}.md").is_file()
+    return (
+        name in get_registered_agents()
+        and (PROMPTS_PATH / "agent_types" / f"{name}.md").is_file()
+    )
 
 
 @dataclass
@@ -61,7 +68,11 @@ def _get_agent_settings(name: str) -> AgentSettings:
             settings = yaml.safe_load(f) or {}
 
     tool_names = settings.get("tools")
-    tools = get_all_tools() if tool_names is None else list(get_tools_by_name(tool_names).values())
+    tools = (
+        get_all_tools()
+        if tool_names is None
+        else list(get_tools_by_name(tool_names).values())
+    )
 
     return AgentSettings(
         tools=tools,
@@ -73,13 +84,13 @@ def _get_agent_settings(name: str) -> AgentSettings:
 async def spawn_agent(
     name: str,
     instruction: str,
-    memory_objects: Optional[dict[str, MemoryObject]] = None
+    memory_objects: Optional[dict[str, MemoryObject]] = None,
 ) -> AgentResponse:
     """
     Creates and runs an agent, running until completion OR until a question is asked
 
     """
-    
+
     if not is_registered_agent(name):
         raise ValueError(
             f"`{name}` is not a registered agent. Register it in "
@@ -99,7 +110,6 @@ async def spawn_agent(
 
     system_prompt = "\n".join([react_prompt, agent_prompt, skills, memory_summary])
 
-
     # retrieve additional settings
     settings = _get_agent_settings(name)
     llm = get_llm(settings.llm)
@@ -110,7 +120,7 @@ async def spawn_agent(
         tools=settings.tools,
         memory=memory_objects,
         allow_questions=settings.allow_questions,
-        )
+    )
 
     return await agent.run_agent(content=instruction)
 

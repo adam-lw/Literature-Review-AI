@@ -52,7 +52,7 @@ class Messages:
             else:
                 # Shorthand form, e.g. `{"system": "..."}` / `{"user": "..."}`:
                 # the single key is the role, its value the content.
-                (role, content), = message.items()
+                ((role, content),) = message.items()
                 message = Message(role=role, content=content)
         self._messages.append(message)
         return self
@@ -85,7 +85,9 @@ class Messages:
     def __setitem__(self, index: int, message: MessageLike) -> None:
         if isinstance(message, Messages):
             if len(message) != 1:
-                raise ValueError("Cannot assign a Messages with more than one message to a single index")
+                raise ValueError(
+                    "Cannot assign a Messages with more than one message to a single index"
+                )
             message = message[0]
         if isinstance(message, dict):
             message = Message(**message)
@@ -135,7 +137,10 @@ def get_llm(model: str, parser: Optional[BaseModel] = None) -> LLM:
     """
     # Nest imports to avoid circular dependencies
     from literature_ai.agent_service.agent.llm.openai import OPENAI_MODELS, OpenAiLLM
-    from literature_ai.agent_service.agent.llm.anthropic import ANTHROPIC_MODELS, AnthropicLLM
+    from literature_ai.agent_service.agent.llm.anthropic import (
+        ANTHROPIC_MODELS,
+        AnthropicLLM,
+    )
     from literature_ai.agent_service.agent.llm.dummy import DummyLLM
     from literature_ai.agent_service.agent.llm.wrappers import ParsingLLM
     from literature_ai.agent_service.agent.llm.langfuse import LangfuseLLM
@@ -159,4 +164,3 @@ def get_llm(model: str, parser: Optional[BaseModel] = None) -> LLM:
     llm = LangfuseLLM(llm=llm)
 
     return llm
-

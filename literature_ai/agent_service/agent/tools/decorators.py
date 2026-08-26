@@ -41,7 +41,9 @@ def tool(
         if memory_type is not None and not (
             isinstance(memory_type, type) and issubclass(memory_type, MemoryObject)
         ):
-            raise TypeError(f"`memory_type` must be a MemoryObject subclass, got {memory_type!r}.")
+            raise TypeError(
+                f"`memory_type` must be a MemoryObject subclass, got {memory_type!r}."
+            )
 
         # Process parameters of decorated functions
         # We need this to automatically generate LLM-passable tool definitions
@@ -67,9 +69,7 @@ def tool(
 
             params.append(param_info)
 
-        tool_description = (
-            description or parsed_doc.short_description or ""
-        )
+        tool_description = description or parsed_doc.short_description or ""
 
         TOOL_REGISTRY[tool_name] = Tool(
             name=tool_name,

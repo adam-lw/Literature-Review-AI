@@ -15,6 +15,7 @@ class PaperProcessingMetrics:
     skipped  – already present in the target table (skipped without error)
     errors   – failed due to a download or parse error
     """
+
     total: int = 0
     inserted: int = 0
     updated: int = 0

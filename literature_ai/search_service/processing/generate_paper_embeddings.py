@@ -6,7 +6,10 @@ from loguru import logger
 
 from literature_ai.db import execute_query, get_inspector, upsert_table
 from literature_ai.search_service.embeddings.core import get_embedding_model
-from literature_ai.search_service.processing.utils import create_embedding_run, resolve_embedding_run
+from literature_ai.search_service.processing.utils import (
+    create_embedding_run,
+    resolve_embedding_run,
+)
 
 INPUT_TABLE = "processed.processed_abstracts"
 EMBEDDINGS_TABLE = "processed.abstract_embeddings"
@@ -32,14 +35,19 @@ def generate_paper_embeddings(embedding_model: str) -> int | None:
     embedding_col = f"embedding_{dim}"
 
     inspector = get_inspector()
-    existing_cols = [c["name"] for c in inspector.get_columns("abstract_embeddings", schema="processed")]
+    existing_cols = [
+        c["name"]
+        for c in inspector.get_columns("abstract_embeddings", schema="processed")
+    ]
     if embedding_col not in existing_cols:
-        logger.info(f"Adding column {embedding_col} VECTOR({dim}) to {EMBEDDINGS_TABLE}")
-        execute_query(f'ALTER TABLE {EMBEDDINGS_TABLE} ADD COLUMN "{embedding_col}" VECTOR({dim})')
+        logger.info(
+            f"Adding column {embedding_col} VECTOR({dim}) to {EMBEDDINGS_TABLE}"
+        )
+        execute_query(
+            f'ALTER TABLE {EMBEDDINGS_TABLE} ADD COLUMN "{embedding_col}" VECTOR({dim})'
+        )
 
-    result = execute_query(
-        f'SELECT "paperId", "title", "abstract" FROM {INPUT_TABLE}'
-    )
+    result = execute_query(f'SELECT "paperId", "title", "abstract" FROM {INPUT_TABLE}')
     rows = result.fetchall()
     if not rows:
         logger.info("generate_paper_embeddings: no rows in processed_abstracts")
@@ -49,7 +57,9 @@ def generate_paper_embeddings(embedding_model: str) -> int | None:
     input_data = {row[0]: (row[1] or "", row[2] or "") for row in rows}
 
     try:
-        run_id, _ = resolve_embedding_run(embedding_model, version, n_dim=dim, user_tags={})
+        run_id, _ = resolve_embedding_run(
+            embedding_model, version, n_dim=dim, user_tags={}
+        )
     except ValueError:
         run_id = create_embedding_run(
             embedding_model=embedding_model,
@@ -66,7 +76,8 @@ def generate_paper_embeddings(embedding_model: str) -> int | None:
     existing_hashes = {r[0]: r[1] for r in existing_result.fetchall()}
 
     ids_to_process = [
-        pid for pid, h in input_hashes.items()
+        pid
+        for pid, h in input_hashes.items()
         if pid not in existing_hashes or existing_hashes[pid] != h
     ]
     skipped = len(input_hashes) - len(ids_to_process)
@@ -81,7 +92,10 @@ def generate_paper_embeddings(embedding_model: str) -> int | None:
         for i in range(0, len(ids_to_process), BATCH_SIZE):
             batch_ids = ids_to_process[i : i + BATCH_SIZE]
             now = datetime.now(timezone.utc)
-            tasks = [model.embed_paper(input_data[pid][0], input_data[pid][1]) for pid in batch_ids]
+            tasks = [
+                model.embed_paper(input_data[pid][0], input_data[pid][1])
+                for pid in batch_ids
+            ]
             vectors = await asyncio.gather(*tasks)
             records = [
                 {
@@ -93,8 +107,15 @@ def generate_paper_embeddings(embedding_model: str) -> int | None:
                 }
                 for pid, vec in zip(batch_ids, vectors)
             ]
-            upsert_table(records, EMBEDDINGS_TABLE, conflict_cols=["paperId", "run_id"], do_update=True)
-            logger.info(f"Upserted {len(records)} embeddings (batch {i // BATCH_SIZE + 1})")
+            upsert_table(
+                records,
+                EMBEDDINGS_TABLE,
+                conflict_cols=["paperId", "run_id"],
+                do_update=True,
+            )
+            logger.info(
+                f"Upserted {len(records)} embeddings (batch {i // BATCH_SIZE + 1})"
+            )
 
     asyncio.run(_run())
     logger.info("generate_paper_embeddings complete")

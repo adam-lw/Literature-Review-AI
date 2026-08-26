@@ -1,6 +1,5 @@
 import argparse
 import os
-import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -8,14 +7,23 @@ from typing import Any
 
 from loguru import logger
 
-from literature_ai.search_service.data_collect.get_ss_embeddings import collect_embeddings
+from literature_ai.search_service.data_collect.get_ss_embeddings import (
+    collect_embeddings,
+)
 from literature_ai.search_service.data_collect.get_ss_papers import collect_papers
 from literature_ai.db import check_connection, apply_schema
-from literature_ai.search_service.logging.data_logger import data_logger
 from literature_ai.search_service.processing.clean_paper import clean_paper
 from literature_ai.search_service.processing.create_index import create_hnsw_index
-from literature_ai.search_service.processing.generate_paper_embeddings import generate_paper_embeddings
-from literature_ai.utils import deep_merge, get_project_root, load_dict, save_dict, PaperProcessingMetrics
+from literature_ai.search_service.processing.generate_paper_embeddings import (
+    generate_paper_embeddings,
+)
+from literature_ai.utils import (
+    deep_merge,
+    get_project_root,
+    load_dict,
+    save_dict,
+    PaperProcessingMetrics,
+)
 
 
 def parse_pipeline_args():
@@ -44,7 +52,9 @@ def run_pipeline(config: dict[str, Any], artifact_path: Path) -> None:
     }
 
     if not check_connection():
-        raise ValueError("Failed to connect to Postgres database. Ensure you have initialised its docker container with `docker compose up -d`")
+        raise ValueError(
+            "Failed to connect to Postgres database. Ensure you have initialised its docker container with `docker compose up -d`"
+        )
 
     apply_schema(Path(__file__).parents[1] / "service_schema.sql")
 
@@ -89,7 +99,9 @@ def run_pipeline(config: dict[str, Any], artifact_path: Path) -> None:
             try:
                 run_id = collect_embeddings(embedding=model)
             except Exception as e:
-                logger.exception(f"embeddings collect stage failed for model '{model}': {e}")
+                logger.exception(
+                    f"embeddings collect stage failed for model '{model}': {e}"
+                )
                 continue
             logger.info(f"collect_embeddings complete for '{model}' (run_id={run_id})")
             if run_id is not None and auto_index:
@@ -104,9 +116,13 @@ def run_pipeline(config: dict[str, Any], artifact_path: Path) -> None:
             try:
                 run_id = generate_paper_embeddings(embedding_model=model)
             except Exception as e:
-                logger.exception(f"embeddings generate stage failed for model '{model}': {e}")
+                logger.exception(
+                    f"embeddings generate stage failed for model '{model}': {e}"
+                )
                 continue
-            logger.info(f"generate_paper_embeddings complete for '{model}' (run_id={run_id})")
+            logger.info(
+                f"generate_paper_embeddings complete for '{model}' (run_id={run_id})"
+            )
             if run_id is not None and auto_index:
                 create_hnsw_index(
                     run_id=run_id,

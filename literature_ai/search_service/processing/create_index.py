@@ -29,7 +29,9 @@ def create_hnsw_index(
 
     with ENGINE.connect() as conn:
         row = conn.execute(
-            text("SELECT n_dim FROM processed.embedding_runs_metadata WHERE run_id = :rid"),
+            text(
+                "SELECT n_dim FROM processed.embedding_runs_metadata WHERE run_id = :rid"
+            ),
             {"rid": run_id},
         ).fetchone()
 
@@ -50,7 +52,9 @@ def create_hnsw_index(
 
     with ENGINE.connect() as conn:
         n_rows = conn.execute(
-            text("SELECT COUNT(*) FROM processed.abstract_embeddings WHERE run_id = :rid"),
+            text(
+                "SELECT COUNT(*) FROM processed.abstract_embeddings WHERE run_id = :rid"
+            ),
             {"rid": run_id},
         ).scalar()
 

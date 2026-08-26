@@ -22,9 +22,14 @@ class NomicEmbedText(EmbeddingModel):
 
     def __init__(self, **config: dict[str, Any]):
         load_dotenv()
-        base_url = str(config.get("base_url") or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"))
+        base_url = str(
+            config.get("base_url")
+            or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        )
         # Ollama ignores the API key, but the OpenAI client requires a non-empty value.
-        self.client = AsyncOpenAI(base_url=base_url, api_key=os.getenv("OLLAMA_API_KEY", "ollama"))
+        self.client = AsyncOpenAI(
+            base_url=base_url, api_key=os.getenv("OLLAMA_API_KEY", "ollama")
+        )
         self.model = str(config.get("model_name", "nomic-embed-text"))
         self.config = config
 

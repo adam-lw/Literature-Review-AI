@@ -1,7 +1,6 @@
 import yaml
 
 from literature_ai.utils import get_project_root
-from literature_ai.agent_service.agent.tools.decorators import tool
 
 SKILLS_PATH = get_project_root() / "config" / "core" / "agent" / "skills"
 
@@ -75,4 +74,3 @@ def get_formatted_skills() -> str:
         "name of a skill to load its full instructions before using it.\n"
         f"{skill_lines}"
     )
-

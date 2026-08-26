@@ -8,7 +8,10 @@ from loguru import logger
 
 from literature_ai.search_service.data_collect.get_ss_papers import _CONFIG, _SESSION
 from literature_ai.db import execute_query, get_inspector, upsert_table
-from literature_ai.search_service.processing.utils import create_embedding_run, resolve_embedding_run
+from literature_ai.search_service.processing.utils import (
+    create_embedding_run,
+    resolve_embedding_run,
+)
 from literature_ai.utils import get_project_root, load_dict
 
 INPUT_TABLE = "processed.processed_abstracts"
@@ -49,12 +52,16 @@ async def _collect_embedding_generator(
         _last_call = time.time()
 
         if response.status_code != 200:
-            logger.error(f"Error in API response. Status: {response.status_code}, body: {response.text[:500]}")
+            logger.error(
+                f"Error in API response. Status: {response.status_code}, body: {response.text[:500]}"
+            )
             break
 
         resp_data = response.json()
         if resp_data is None:
-            logger.error(f"Empty response body for chunk starting at index {ids.index(chunk[0])}")
+            logger.error(
+                f"Empty response body for chunk starting at index {ids.index(chunk[0])}"
+            )
             break
 
         batch = []
@@ -90,16 +97,25 @@ def collect_embeddings(embedding: Literal["specter_v1", "specter_v2"]) -> int | 
     Returns the run_id used, or None if all rows were already up to date.
     """
     if embedding not in _embedding_ndims:
-        raise ValueError(f"Unknown embedding '{embedding}'. Available: {list(_embedding_ndims)}")
+        raise ValueError(
+            f"Unknown embedding '{embedding}'. Available: {list(_embedding_ndims)}"
+        )
 
     dim = _embedding_ndims[embedding]
     embedding_col = f"embedding_{dim}"
 
     inspector = get_inspector()
-    existing_cols = [c["name"] for c in inspector.get_columns("abstract_embeddings", schema="processed")]
+    existing_cols = [
+        c["name"]
+        for c in inspector.get_columns("abstract_embeddings", schema="processed")
+    ]
     if embedding_col not in existing_cols:
-        logger.info(f"Adding column {embedding_col} VECTOR({dim}) to {EMBEDDINGS_TABLE}")
-        execute_query(f'ALTER TABLE {EMBEDDINGS_TABLE} ADD COLUMN "{embedding_col}" VECTOR({dim})')
+        logger.info(
+            f"Adding column {embedding_col} VECTOR({dim}) to {EMBEDDINGS_TABLE}"
+        )
+        execute_query(
+            f'ALTER TABLE {EMBEDDINGS_TABLE} ADD COLUMN "{embedding_col}" VECTOR({dim})'
+        )
 
     input_result = execute_query(f'SELECT "paperId", "abstract" FROM {INPUT_TABLE}')
     input_hashes: dict[str, str] = {
@@ -132,7 +148,9 @@ def collect_embeddings(embedding: Literal["specter_v1", "specter_v2"]) -> int | 
     ]
 
     skipped = len(input_hashes) - len(ids_to_process)
-    logger.info(f"collect_embeddings: {len(ids_to_process)} to process, {skipped} skipped (unchanged)")
+    logger.info(
+        f"collect_embeddings: {len(ids_to_process)} to process, {skipped} skipped (unchanged)"
+    )
 
     if not ids_to_process:
         return None
@@ -150,7 +168,12 @@ def collect_embeddings(embedding: Literal["specter_v1", "specter_v2"]) -> int | 
                 }
                 for item in batch
             ]
-            upsert_table(records, EMBEDDINGS_TABLE, conflict_cols=["paperId", "run_id"], do_update=True)
+            upsert_table(
+                records,
+                EMBEDDINGS_TABLE,
+                conflict_cols=["paperId", "run_id"],
+                do_update=True,
+            )
             logger.info(f"Upserted {len(records)} embeddings")
 
     asyncio.run(_run())

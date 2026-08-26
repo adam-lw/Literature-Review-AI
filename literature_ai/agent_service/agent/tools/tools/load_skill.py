@@ -2,7 +2,10 @@ from literature_ai.agent_service.agent.tools.decorators import tool
 from literature_ai.agent_service.agent.tools.skills import SKILLS, register_skills
 
 
-@tool(name="load_skill", description="Loads a skill by name. Should match a skill name exactly.")
+@tool(
+    name="load_skill",
+    description="Loads a skill by name. Should match a skill name exactly.",
+)
 def load_skill(skill_name: str) -> str:
     """
     Load a SKILL.md file by name and return its contents as a string.

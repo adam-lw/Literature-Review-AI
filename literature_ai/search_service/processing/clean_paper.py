@@ -14,18 +14,20 @@ from literature_ai.utils import PaperProcessingMetrics
 INPUT_TABLE = "raw.raw_paper_searches"
 OUTPUT_TABLE = "processed.processed_abstracts"
 
-_FORMULA_RE = re.compile(r'\$|\\\(|\\\[|\\begin\{')
+_FORMULA_RE = re.compile(r"\$|\\\(|\\\[|\\begin\{")
 
-_DISPLAY_MATH_DOLLAR = re.compile(r'\$\$(.+?)\$\$', re.DOTALL)
-_DISPLAY_MATH_BRACKET = re.compile(r'\\\[(.+?)\\\]', re.DOTALL)
-_INLINE_MATH_PAREN = re.compile(r'\\\((.+?)\\\)', re.DOTALL)
-_INLINE_MATH_DOLLAR = re.compile(r'\$(.+?)\$')
-_MATH_ENV = re.compile(r'\\begin\{[^}]+\}(.*?)\\end\{[^}]+\}', re.DOTALL)
-_FORMATTING_CMD = re.compile(r'\\(?:textbf|textit|emph|underline|texttt|text|mathrm|mathbf|mathit)\{(.+?)\}')
-_DISCARD_CMD = re.compile(r'\\(?:cite|ref|label|footnote)\{[^}]*\}')
-_LONE_CMD = re.compile(r'\\[a-zA-Z]+\s?')
-_WHITESPACE = re.compile(r'\s+')
-_HTML_TAG = re.compile(r'<[^>]+>')
+_DISPLAY_MATH_DOLLAR = re.compile(r"\$\$(.+?)\$\$", re.DOTALL)
+_DISPLAY_MATH_BRACKET = re.compile(r"\\\[(.+?)\\\]", re.DOTALL)
+_INLINE_MATH_PAREN = re.compile(r"\\\((.+?)\\\)", re.DOTALL)
+_INLINE_MATH_DOLLAR = re.compile(r"\$(.+?)\$")
+_MATH_ENV = re.compile(r"\\begin\{[^}]+\}(.*?)\\end\{[^}]+\}", re.DOTALL)
+_FORMATTING_CMD = re.compile(
+    r"\\(?:textbf|textit|emph|underline|texttt|text|mathrm|mathbf|mathit)\{(.+?)\}"
+)
+_DISCARD_CMD = re.compile(r"\\(?:cite|ref|label|footnote)\{[^}]*\}")
+_LONE_CMD = re.compile(r"\\[a-zA-Z]+\s?")
+_WHITESPACE = re.compile(r"\s+")
+_HTML_TAG = re.compile(r"<[^>]+>")
 
 
 def _hash(text: str | None) -> str:
@@ -38,17 +40,17 @@ def _has_formula(text: str) -> bool:
 
 def _clean_text(raw: str) -> str:
     """Strip HTML tags, unescape entities, remove LaTeX markup, and collapse whitespace."""
-    text = _HTML_TAG.sub(' ', raw)
+    text = _HTML_TAG.sub(" ", raw)
     text = _html.unescape(text)
-    text = _DISPLAY_MATH_DOLLAR.sub(r'\1', text)
-    text = _DISPLAY_MATH_BRACKET.sub(r'\1', text)
-    text = _INLINE_MATH_PAREN.sub(r'\1', text)
-    text = _INLINE_MATH_DOLLAR.sub(r'\1', text)
-    text = _MATH_ENV.sub(r'\1', text)
-    text = _FORMATTING_CMD.sub(r'\1', text)
-    text = _DISCARD_CMD.sub('', text)
-    text = _LONE_CMD.sub(' ', text)
-    return _WHITESPACE.sub(' ', text).strip()
+    text = _DISPLAY_MATH_DOLLAR.sub(r"\1", text)
+    text = _DISPLAY_MATH_BRACKET.sub(r"\1", text)
+    text = _INLINE_MATH_PAREN.sub(r"\1", text)
+    text = _INLINE_MATH_DOLLAR.sub(r"\1", text)
+    text = _MATH_ENV.sub(r"\1", text)
+    text = _FORMATTING_CMD.sub(r"\1", text)
+    text = _DISCARD_CMD.sub("", text)
+    text = _LONE_CMD.sub(" ", text)
+    return _WHITESPACE.sub(" ", text).strip()
 
 
 def _detect_language(text: str) -> str | None:
@@ -60,7 +62,7 @@ def _detect_language(text: str) -> str | None:
 
 def _load_candidates(max_processed_at) -> pd.DataFrame:
     if max_processed_at is None:
-        return pd.read_sql(f'SELECT * FROM {INPUT_TABLE}', ENGINE)
+        return pd.read_sql(f"SELECT * FROM {INPUT_TABLE}", ENGINE)
     return pd.read_sql(
         text(f'SELECT * FROM {INPUT_TABLE} WHERE "last_updated" > :ts'),
         ENGINE,
@@ -112,17 +114,19 @@ def clean_paper(
         title_clean = _clean_text(row.get("title") or "") or None
         language = _detect_language(abstract_clean) if abstract_clean else None
 
-        records.append({
-            "paperId": paper_id,
-            "title": title_clean,
-            "abstract": abstract_clean or None,
-            "abstract_length": len(abstract_clean),
-            "word_count": len(abstract_clean.split()) if abstract_clean else 0,
-            "has_formula": has_formula,
-            "language": language,
-            "content_hash": content_hash,
-            "processed_at": now,
-        })
+        records.append(
+            {
+                "paperId": paper_id,
+                "title": title_clean,
+                "abstract": abstract_clean or None,
+                "abstract_length": len(abstract_clean),
+                "word_count": len(abstract_clean.split()) if abstract_clean else 0,
+                "has_formula": has_formula,
+                "language": language,
+                "content_hash": content_hash,
+                "processed_at": now,
+            }
+        )
 
         if is_update:
             metrics.updated += 1

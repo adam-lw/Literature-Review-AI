@@ -56,7 +56,12 @@ def resolve_embedding_run(
     with ENGINE.connect() as conn:
         rows = conn.execute(
             sql,
-            {"model": model_name, "version": model_version, "n_dim": n_dim, "tags": tags_json},
+            {
+                "model": model_name,
+                "version": model_version,
+                "n_dim": n_dim,
+                "tags": tags_json,
+            },
         ).fetchall()
 
     if not rows:

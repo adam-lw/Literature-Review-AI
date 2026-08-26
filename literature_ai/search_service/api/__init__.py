@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 
-from literature_ai.search_service.api.routers.embedding_models import router as embedding_models_router
+from literature_ai.search_service.api.routers.embedding_models import (
+    router as embedding_models_router,
+)
 from literature_ai.search_service.api.routers.search import router as search_router
 
 app = FastAPI(

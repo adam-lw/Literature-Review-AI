@@ -74,7 +74,13 @@ async def save_table_async(
     await loop.run_in_executor(None, save_table, df, table_path, if_exists)
 
 
-def upsert_table(records: list[dict], table_path: str, conflict_cols: list[str], *, do_update: bool = True) -> int:
+def upsert_table(
+    records: list[dict],
+    table_path: str,
+    conflict_cols: list[str],
+    *,
+    do_update: bool = True,
+) -> int:
     """Upsert records into a PostgreSQL table.
 
     Requires a UNIQUE or PRIMARY KEY constraint on conflict_cols:
@@ -112,11 +118,16 @@ def upsert_table(records: list[dict], table_path: str, conflict_cols: list[str],
 
 
 async def upsert_table_async(
-    records: list[dict], table_path: str, conflict_cols: list[str], *, do_update: bool = True
+    records: list[dict],
+    table_path: str,
+    conflict_cols: list[str],
+    *,
+    do_update: bool = True,
 ) -> int:
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(
-        None, lambda: upsert_table(records, table_path, conflict_cols, do_update=do_update)
+        None,
+        lambda: upsert_table(records, table_path, conflict_cols, do_update=do_update),
     )
 
 

@@ -1,7 +1,10 @@
 from fastapi import APIRouter
 from sqlalchemy import text
 
-from literature_ai.search_service.api.models import EmbeddingModelsResponse, EmbeddingRun
+from literature_ai.search_service.api.models import (
+    EmbeddingModelsResponse,
+    EmbeddingRun,
+)
 from literature_ai.db import ENGINE
 
 router = APIRouter(prefix="/embedding-models", tags=["embedding-models"])

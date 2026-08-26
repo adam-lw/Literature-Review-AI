@@ -1,7 +1,6 @@
 from typing import Any
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
-import math
 import os
 
 from literature_ai.search_service.embeddings.core import EmbeddingModel
@@ -17,7 +16,9 @@ _DEFAULT_OUTPUT_DIM = 1024
 # instruction, while documents are embedded as-is. The instruction is plain
 # prepended text — Ollama does not add it automatically. See the model card:
 # https://huggingface.co/Qwen/Qwen3-Embedding-4B
-_QUERY_INSTRUCTION = "Given a search query, retrieve relevant academic papers that answer the query"
+_QUERY_INSTRUCTION = (
+    "Given a search query, retrieve relevant academic papers that answer the query"
+)
 
 
 class Qwen3Embedding(EmbeddingModel):
@@ -35,9 +36,14 @@ class Qwen3Embedding(EmbeddingModel):
 
     def __init__(self, **config: dict[str, Any]):
         load_dotenv()
-        base_url = str(config.get("base_url") or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1"))
+        base_url = str(
+            config.get("base_url")
+            or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        )
         # Ollama ignores the API key, but the OpenAI client requires a non-empty value.
-        self.client = AsyncOpenAI(base_url=base_url, api_key=os.getenv("OLLAMA_API_KEY", "ollama"))
+        self.client = AsyncOpenAI(
+            base_url=base_url, api_key=os.getenv("OLLAMA_API_KEY", "ollama")
+        )
         self.model = str(config.get("model_name", "qwen3-embedding:4b"))
         self.config = config
 

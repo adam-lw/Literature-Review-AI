@@ -64,7 +64,9 @@ class OpenAiLLM(LLM):
         )
 
         tool_calls = [
-            ToolCall(id=item.call_id, name=item.name, arguments=json.loads(item.arguments))
+            ToolCall(
+                id=item.call_id, name=item.name, arguments=json.loads(item.arguments)
+            )
             for item in response.output
             if item.type == "function_call"
         ]

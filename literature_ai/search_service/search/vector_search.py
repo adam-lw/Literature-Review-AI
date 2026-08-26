@@ -5,7 +5,10 @@ from sqlalchemy import text
 
 from literature_ai.db import ENGINE
 from literature_ai.search_service.embeddings import get_embedding_model
-from literature_ai.search_service.processing.utils import resolve_embedding_run, verify_index
+from literature_ai.search_service.processing.utils import (
+    resolve_embedding_run,
+    verify_index,
+)
 
 EMBEDDINGS_TABLE = "processed.abstract_embeddings"
 
@@ -66,7 +69,17 @@ async def vector_search_async(
             {"query_vec": query_vec_str, "run_id": run_id, "n_results": n_results},
         ).fetchall()
 
-    keys = ["paperId", "title", "abstract", "year", "venue", "citationCount", "url", "DOI", "distance"]
+    keys = [
+        "paperId",
+        "title",
+        "abstract",
+        "year",
+        "venue",
+        "citationCount",
+        "url",
+        "DOI",
+        "distance",
+    ]
     return [dict(zip(keys, row)) for row in rows]
 
 

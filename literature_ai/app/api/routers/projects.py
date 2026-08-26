@@ -11,7 +11,9 @@ results_router = APIRouter(prefix="/results", tags=["projects"])
 def _try_get_project(project_id: str) -> dict:
     project = db.get_project(project_id)
     if project is None:
-        raise HTTPException(status_code=404, detail=f"No project found for project_id={project_id!r}")
+        raise HTTPException(
+            status_code=404, detail=f"No project found for project_id={project_id!r}"
+        )
     return project
 
 
@@ -41,7 +43,9 @@ def get_project(project_id: str) -> models.ProjectOut:
 
 
 @router.patch("/{project_id}", response_model=models.ProjectOut)
-def update_project(project_id: str, request: models.ProjectUpdateRequest) -> models.ProjectOut:
+def update_project(
+    project_id: str, request: models.ProjectUpdateRequest
+) -> models.ProjectOut:
     _try_get_project(project_id)
     project = db.update_project(project_id, **request.model_dump(exclude_unset=True))
     assert project is not None
@@ -54,10 +58,15 @@ def delete_project(project_id: str) -> None:
 
 
 @router.post("/{project_id}/searches", response_model=models.SearchOut)
-def add_search(project_id: str, request: models.SearchCreateRequest) -> models.SearchOut:
+def add_search(
+    project_id: str, request: models.SearchCreateRequest
+) -> models.SearchOut:
     project = _try_get_project(project_id)
     if project["embedding_run_id"] is None:
-        raise HTTPException(status_code=422, detail=f"Project {project_id!r} has no embedding_run_id set")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Project {project_id!r} has no embedding_run_id set",
+        )
 
     query = request.query.strip()
     search = db.create_search(project_id, query, request.n_results)

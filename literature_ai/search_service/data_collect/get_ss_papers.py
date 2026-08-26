@@ -25,7 +25,6 @@ _SESSION = make_session(
 _LAST_CALL: float = 0.0
 
 
-
 async def _iter_papers(
     query: str,
     research_fields: list[str],
@@ -43,7 +42,9 @@ async def _iter_papers(
     if verbosity > 0:
         logger.info(f"Collecting papers for query `{query}`")
 
-    if not all(field in _CONFIG.get("research_fields", []) for field in research_fields):
+    if not all(
+        field in _CONFIG.get("research_fields", []) for field in research_fields
+    ):
         raise ValueError(
             f"Unrecognised field(s) of study: {[f for f in research_fields if f not in _CONFIG['research_fields']]}"
         )
@@ -96,7 +97,9 @@ async def _iter_papers(
 
         data = response.json()
         try:
-            data_logger.log_api_call("semantic_scholar_api", endpoint, params, data, duration, error=None)
+            data_logger.log_api_call(
+                "semantic_scholar_api", endpoint, params, data, duration, error=None
+            )
         except Exception:
             pass
 
@@ -152,8 +155,12 @@ def collect_papers(
 
     Returns aggregate PaperProcessingMetrics across all queries.
     """
-    
-    query_list = queries if isinstance(queries, list) else [{"query": queries, "research_fields": research_fields}]
+
+    query_list = (
+        queries
+        if isinstance(queries, list)
+        else [{"query": queries, "research_fields": research_fields}]
+    )
 
     metrics = PaperProcessingMetrics()
 
@@ -167,8 +174,12 @@ def collect_papers(
                 sort_by=query_settings.get("sort_by", sort_by),
                 ascending=query_settings.get("ascending", ascending),
                 years=query_settings.get("years", years),
-                open_access_only=query_settings.get("open_access_only", open_access_only),
-                min_citation_count=query_settings.get("min_citation_count", min_citation_count),
+                open_access_only=query_settings.get(
+                    "open_access_only", open_access_only
+                ),
+                min_citation_count=query_settings.get(
+                    "min_citation_count", min_citation_count
+                ),
                 verbosity=verbosity,
             ):
                 if results_per_query:
@@ -185,22 +196,32 @@ def collect_papers(
                     if not isinstance(ext_ids, dict):
                         ext_ids = {}
                     ext_fields = ["ArXiV", "DBLP", "MAG", "DOI"]
-                    record.update(**{field: ext_ids.get(field, None) for field in ext_fields})
+                    record.update(
+                        **{field: ext_ids.get(field, None) for field in ext_fields}
+                    )
 
                     pdf_info = record.pop("openAccessPdf")
                     if not isinstance(pdf_info, dict):
                         pdf_info = {}
                     pdf_fields = ["url", "status"]
-                    record.update(**{field: pdf_info.get(field, None) for field in pdf_fields})
+                    record.update(
+                        **{field: pdf_info.get(field, None) for field in pdf_fields}
+                    )
 
-                    record["fieldsOfStudy"] = json.dumps(record.get("fieldsOfStudy") or [])
-                    record["publicationTypes"] = json.dumps(record.get("publicationTypes") or [])
-                    
+                    record["fieldsOfStudy"] = json.dumps(
+                        record.get("fieldsOfStudy") or []
+                    )
+                    record["publicationTypes"] = json.dumps(
+                        record.get("publicationTypes") or []
+                    )
 
                 metrics.total += len(batch)
                 try:
                     actual_inserted = await upsert_table_async(
-                        batch, RAW_PAPERS_TABLE, conflict_cols=["paperId"], do_update=False
+                        batch,
+                        RAW_PAPERS_TABLE,
+                        conflict_cols=["paperId"],
+                        do_update=False,
                     )
                     metrics.inserted += actual_inserted
                     metrics.skipped += len(batch) - actual_inserted

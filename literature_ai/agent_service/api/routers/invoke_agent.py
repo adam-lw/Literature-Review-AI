@@ -3,10 +3,20 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from langfuse import observe, propagate_attributes
 
-from literature_ai.agent_service.agent.agent.core.response import AgentResponse, Question
-from literature_ai.agent_service.agent.agent.spawn_agent import resume_agent, spawn_agent
+from literature_ai.agent_service.agent.agent.core.response import (
+    AgentResponse,
+    Question,
+)
+from literature_ai.agent_service.agent.agent.spawn_agent import (
+    resume_agent,
+    spawn_agent,
+)
 from literature_ai.agent_service.agent.llm.core import Messages
-from literature_ai.agent_service.agent.memory import MemoryObject, PaperMemoryObject, PaperRecord
+from literature_ai.agent_service.agent.memory import (
+    MemoryObject,
+    PaperMemoryObject,
+    PaperRecord,
+)
 from literature_ai.agent_service.api.models import (
     AgentQuestion,
     ChatMessage,
@@ -48,7 +58,9 @@ def _to_response(agent_response: AgentResponse) -> InvokeAgentResponse:
     next message) to continue the conversation, since this endpoint keeps no
     server-side memory between calls.
     """
-    messages = [ChatMessage(role=m.role, content=m.content) for m in agent_response.state]
+    messages = [
+        ChatMessage(role=m.role, content=m.content) for m in agent_response.state
+    ]
 
     if isinstance(agent_response.result, Question):
         return InvokeAgentResponse(
@@ -77,7 +89,6 @@ async def create_agent(request: CreateAgentRequest) -> InvokeAgentResponse:
 
     """
     with propagate_attributes(session_id=request.session_id, tags=[request.stage]):
-
         memory = _build_memory(request.paper_lists)
 
         try:
@@ -107,7 +118,10 @@ async def invoke_agent(request: InvokeAgentRequest) -> InvokeAgentResponse:
 
         try:
             agent_response = await resume_agent(
-                name=request.stage, history=history, instruction=instruction, memory_objects=memory
+                name=request.stage,
+                history=history,
+                instruction=instruction,
+                memory_objects=memory,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc

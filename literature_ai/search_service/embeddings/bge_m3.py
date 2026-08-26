@@ -28,7 +28,11 @@ class BgeM3Embedding(EmbeddingModel):
 
     def _embed(self, text: str) -> list[float]:
         inputs = self.tokenizer(
-            text, padding=True, truncation=True, max_length=self.max_length, return_tensors="pt"
+            text,
+            padding=True,
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt",
         )
         with torch.no_grad():
             outputs = self.model(**inputs)

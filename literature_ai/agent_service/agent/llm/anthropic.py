@@ -56,10 +56,14 @@ class AnthropicLLM(LLM):
             model=self.model,
             tools=self.format_tools(tools) if tools else omit,
         )
-        
+
         # translate anthropic's vendor specific tool call to generic ToolCall object
         tool_calls = [
-            ToolCall(id=block.id, name=block.name, arguments=cast(dict[str, Any], block.input))
+            ToolCall(
+                id=block.id,
+                name=block.name,
+                arguments=cast(dict[str, Any], block.input),
+            )
             for block in response.content
             if isinstance(block, ToolUseBlock)
         ]
