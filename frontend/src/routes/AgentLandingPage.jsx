@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '../context/ProjectsContext.jsx'
-import CriteriaEditor from '../components/CriteriaEditor.jsx'
 
 export default function AgentLandingPage() {
   const navigate = useNavigate()
   const { createAgentProject } = useProjects()
   const [description, setDescription] = useState('')
-  const [criteria, setCriteria] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const canSubmit = description.trim().length > 0 && !submitting
@@ -18,7 +16,7 @@ export default function AgentLandingPage() {
     setSubmitting(true)
     const project = await createAgentProject({
       description: description.trim(),
-      inclusion_criteria: criteria.trim() || null,
+      inclusion_criteria: null,
     })
     navigate(`/agent-projects/${project.project_id}`)
   }
@@ -42,9 +40,6 @@ export default function AgentLandingPage() {
           onChange={(e) => setDescription(e.target.value)}
           placeholder="e.g. A review of transformer-based approaches to low-resource machine translation published since 2020…"
         />
-
-        <label className="field-label">Inclusion / exclusion criteria (optional)</label>
-        <CriteriaEditor value={criteria} onChange={setCriteria} />
 
         <button type="submit" className="submit-btn" disabled={!canSubmit}>
           {submitting ? 'Starting…' : 'Start agent project'}
