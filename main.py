@@ -7,10 +7,10 @@ from fastapi.staticfiles import StaticFiles
 
 from literature_ai.app.api.routers.health import router as health_router
 from literature_ai.app.api.routers.projects import results_router, router as projects_router
-from literature_ai.core.agent.tools import register_all_tools
-from literature_ai.core.api.routers.embedding_models import router as embedding_models_router
-from literature_ai.core.api.routers.invoke_agent import router as invoke_agent_router
-from literature_ai.core.api.routers.search import router as search_router
+from literature_ai.agent_service.agent.tools import register_all_tools
+from literature_ai.search_service.api.routers.embedding_models import router as embedding_models_router
+from literature_ai.agent_service.api.routers.invoke_agent import router as invoke_agent_router
+from literature_ai.search_service.api.routers.search import router as search_router
 from literature_ai.db import apply_schema
 
 _REPO_ROOT = Path(__file__).resolve().parent
@@ -21,7 +21,7 @@ register_all_tools()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    apply_schema(_REPO_ROOT / "literature_ai" / "core" / "service_schema.sql")
+    apply_schema(_REPO_ROOT / "literature_ai" / "search_service" / "service_schema.sql")
     apply_schema(_REPO_ROOT / "literature_ai" / "app" / "schema.sql")
     yield
 

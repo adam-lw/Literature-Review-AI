@@ -2,8 +2,8 @@
 app.paper_inclusion_exclusion, app.paper_summarisations, app.outputs).
 
 Sync SQLAlchemy Core over the shared ENGINE, matching the style of
-literature_ai.core.api.routers.embedding_models. This module is pure CRUD against the app
-schema — it does not call literature_ai.core.search.vector_search itself; the projects API
+literature_ai.search_service.api.routers.embedding_models. This module is pure CRUD against the app
+schema — it does not call literature_ai.search_service.search.vector_search itself; the projects API
 router is responsible for running a search and passing the results to save_search_results.
 """
 
@@ -51,7 +51,7 @@ def create_project(
 
     Raises ValueError if `embedding_run_id` doesn't reference an existing embedding run.
     """
-    from literature_ai.core.search.vector_search import vector_search
+    from literature_ai.search_service.search.vector_search import vector_search
 
     with ENGINE.connect() as conn:
         run_row = conn.execute(

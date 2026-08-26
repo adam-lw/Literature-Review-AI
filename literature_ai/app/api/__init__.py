@@ -10,7 +10,7 @@ from literature_ai.db import apply_schema
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    apply_schema(Path(__file__).resolve().parents[2] / "core" / "service_schema.sql")
+    apply_schema(Path(__file__).resolve().parents[2] / "search_service" / "service_schema.sql")
     apply_schema(Path(__file__).resolve().parents[1] / "schema.sql")
     yield
 

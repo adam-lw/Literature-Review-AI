@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 
 from literature_ai.app import persistence_handling as db
 from literature_ai.app.api import models
-from literature_ai.core.search.vector_search import vector_search
+from literature_ai.search_service.search.vector_search import vector_search
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 results_router = APIRouter(prefix="/results", tags=["projects"])

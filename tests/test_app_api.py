@@ -5,8 +5,8 @@ from fastapi.testclient import TestClient
 
 import literature_ai.app.api as app_api
 import literature_ai.app.api.routers.projects as projects_router
-import literature_ai.core.api.routers.embedding_models as embedding_models_router
-import literature_ai.core.api.routers.search as search_router
+import literature_ai.search_service.api.routers.embedding_models as embedding_models_router
+import literature_ai.search_service.api.routers.search as search_router
 import main
 
 
