@@ -266,7 +266,6 @@ export default function ProjectWorkspace() {
       agentFlow.phase.stage,
       project.description,
       includedPaperLists,
-      project.inclusion_criteria,
     )
     appendPhaseResult(result)
   }

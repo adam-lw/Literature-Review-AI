@@ -674,11 +674,25 @@ a {
 
 .agent-continue-bar {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.agent-continue-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.agent-continue-actions {
+  display: flex;
   align-items: center;
   gap: var(--space-3);
 }
 
-.agent-continue-bar .submit-btn {
+.agent-continue-actions .submit-btn,
+.agent-continue-actions .chat-reveal-btn {
   margin-top: 0;
 }
 
@@ -845,10 +859,15 @@ a {
 .chat-reveal-btn {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  padding: var(--space-2) var(--space-4);
-  color: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-5);
+  font-weight: 600;
+  color: var(--text);
   margin-top: var(--space-5);
+}
+
+.chat-reveal-btn:hover {
+  background: var(--surface-2);
 }
 
 /* Results panel / search term groups */

@@ -12,13 +12,12 @@ import { apiClient } from './client.js'
 // `sessionId` doesn't affect the response - it's forwarded as-is so the backend can group this
 // conversation's per-call Langfuse traces into one session in the dashboard.
 
-export async function createAgent(stage, message, paperLists, sessionId, inclusionCriteria) {
+export async function createAgent(stage, content, paperLists, sessionId) {
   return apiClient.post('/invoke-agent/create', {
     stage,
-    message,
+    content,
     ...(paperLists ? { paper_lists: paperLists } : {}),
     ...(sessionId ? { session_id: sessionId } : {}),
-    ...(inclusionCriteria ? { inclusion_criteria: inclusionCriteria } : {}),
   })
 }
 

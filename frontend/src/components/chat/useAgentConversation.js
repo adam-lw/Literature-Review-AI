@@ -27,16 +27,15 @@ export function useAgentConversation() {
     return response
   }
 
-  const start = useCallback(async (stage, text, paperLists, inclusionCriteria) => {
+  const start = useCallback(async (stage, text, paperLists) => {
     stageRef.current = stage
     setSending(true)
     try {
       const response = await createAgent(
         stage,
-        { role: 'user', content: text },
+        text,
         paperLists,
         sessionIdRef.current,
-        inclusionCriteria,
       )
       return { ok: true, response: applyResponse(response) }
     } catch (err) {

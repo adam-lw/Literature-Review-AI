@@ -82,8 +82,6 @@ export default function AgentProjectWorkspace() {
     const result = await phaseAgent.start(
       agentFlow.phase.stage,
       project.description,
-      undefined,
-      project.inclusion_criteria,
     )
     appendPhaseResult(result)
   }
