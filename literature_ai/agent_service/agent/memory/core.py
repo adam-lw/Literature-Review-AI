@@ -14,30 +14,24 @@ class MemoryObject:
 
     id: str
 
+    def get_summary(self) -> str:
+        """
+        Short LLM-facing description of what this memory object is and how to
+        retrieve its contents, plus any high-level info (e.g. counts) worth
+        surfacing without dumping full contents into the prompt. Subclasses
+        should override this - the default is a generic fallback.
+        """
+        return f"{self.id}: a `{self.__class__.__name__}` memory object."
+
 
 def get_formatted_memory(memory: dict[str, MemoryObject]) -> str:
     """Returns a string summarizing available memory objects for use by an LLM."""
     if not memory:
         return ""
 
-    # Imported lazily to avoid a circular import (paper.py imports MemoryObject from here).
-    from literature_ai.agent_service.agent.memory.paper import PaperMemoryObject
-
-    lines: list[str] = []
-    for obj in memory.values():
-        if isinstance(obj, PaperMemoryObject):
-            lines.extend(
-                f"- {paper_id}: {paper.title or 'Untitled paper'}"
-                for paper_id, paper in obj.papers.items()
-            )
-        else:
-            lines.append(f"- {obj.id}")
-
-    if not lines:
-        return ""
+    lines = [f"- {obj.get_summary()}" for obj in memory.values()]
 
     return (
-        "\n\nThe following items are available in memory. Call a memory-aware "
-        "tool (e.g. `retrieve_findings`) with an id below to view its full "
-        "stored contents.\n" + "\n".join(lines)
+        "\n\nThe following items are available in memory. Call the matching "
+        "memory-aware tool for its kind to view full contents.\n" + "\n".join(lines)
     )
