@@ -27,14 +27,14 @@ export function useAgentConversation() {
     return response
   }
 
-  const start = useCallback(async (stage, text, paperLists) => {
+  const start = useCallback(async (stage, text, memory) => {
     stageRef.current = stage
     setSending(true)
     try {
       const response = await createAgent(
         stage,
         text,
-        paperLists,
+        memory,
         sessionIdRef.current,
       )
       return { ok: true, response: applyResponse(response) }
@@ -46,11 +46,11 @@ export function useAgentConversation() {
     }
   }, [])
 
-  const send = useCallback(async (text, paperLists) => {
+  const send = useCallback(async (text, memory) => {
     const messages = [...(historyRef.current ?? []), { role: 'user', content: text }]
     setSending(true)
     try {
-      const response = await invokeAgent(stageRef.current, messages, paperLists, sessionIdRef.current)
+      const response = await invokeAgent(stageRef.current, messages, memory, sessionIdRef.current)
       return { ok: true, response: applyResponse(response) }
     } catch (err) {
       setStatus('error')

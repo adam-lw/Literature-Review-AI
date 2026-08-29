@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'reac
 import { useParams } from 'react-router-dom'
 import { useProjects } from '../context/ProjectsContext.jsx'
 import { useWorkspaceMode } from '../context/WorkspaceModeContext.jsx'
+import { paperListMemory, scopingMemory } from '../api/agentClient.js'
 import CriteriaEditor from '../components/CriteriaEditor.jsx'
 import ResultsPanel from '../components/ResultsPanel.jsx'
 import ChatTurn from '../components/chat/ChatTurn.jsx'
@@ -9,11 +10,11 @@ import ActionBar from '../components/chat/ActionBar.jsx'
 import ChatComposer from '../components/chat/ChatComposer.jsx'
 import FormatQuestionnaire from '../components/chat/FormatQuestionnaire.jsx'
 import PlaceholderNotice from '../components/chat/PlaceholderNotice.jsx'
-import AgentStepPrompt from '../components/chat/AgentStepPrompt.jsx'
 import AgentContinueBar from '../components/chat/AgentContinueBar.jsx'
 import AgentQuestion from '../components/chat/AgentQuestion.jsx'
 import { AGENT_PHASES, useAgentPhaseFlow } from '../components/chat/useAgentPhaseFlow.js'
 import { useAgentConversation } from '../components/chat/useAgentConversation.js'
+import { tryParseScope } from '../components/chat/scopeMemory.js'
 
 export default function ProjectWorkspace() {
   const { id } = useParams()
@@ -29,12 +30,18 @@ export default function ProjectWorkspace() {
   const [conversation, setConversation] = useState([])
   const [chatOpen, setChatOpen] = useState(false)
   const [phaseStarted, setPhaseStarted] = useState(false)
+  // The scoping phase's finalized JSON specification (see `scopeMemory.js`) - once set, it's
+  // resent as memory to every later phase/chat, and can itself be updated by scoping_chat.
+  const [scopeSpecification, setScopeSpecification] = useState(null)
 
   const agentFlow = useAgentPhaseFlow(workspaceMode === 'agent')
   // One phase = one agent conversation: `phaseAgent` is reset (fresh create_agent call) every
-  // time `agentFlow` advances to a new phase. `chatAgent` is the separate freeform "chatbot"
-  // conversation opened from manual mode's action bar.
+  // time `agentFlow` advances to a new phase, and drives that phase's own Q&A. `phaseChatAgent`
+  // is the separate "Chat with AI" conversation for the current phase, talking to its
+  // `<phase>_chat` stage instead of the phase's own. `chatAgent` is the separate freeform
+  // "chatbot" conversation opened from manual mode's action bar.
   const phaseAgent = useAgentConversation()
+  const phaseChatAgent = useAgentConversation()
   const chatAgent = useAgentConversation()
 
   // This project defaults to Manual mode every time it's (re-)opened; the slider can flip
@@ -68,7 +75,9 @@ export default function ProjectWorkspace() {
     setConversation([])
     setChatOpen(false)
     setPhaseStarted(false)
+    setScopeSpecification(null)
     phaseAgent.reset()
+    phaseChatAgent.reset()
     chatAgent.reset()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load])
@@ -94,9 +103,9 @@ export default function ProjectWorkspace() {
     return { searches: project.searches.length, papers, included }
   }, [project])
 
-  // Paper context to hand the chatbot agent alongside the message history. Only included papers
-  // are sent, matching the "ask about the N included papers" framing shown in the chat prompt.
-  const includedPaperLists = useMemo(() => {
+  // Paper context to hand agents alongside the message history. Only included papers are sent,
+  // matching the "ask about the N included papers" framing shown in the chat prompt.
+  const includedPaperMemory = useMemo(() => {
     if (!project) return undefined
     const papers = project.searches.flatMap((s) =>
       s.results
@@ -112,8 +121,16 @@ export default function ProjectWorkspace() {
           DOI: r.doi,
         })),
     )
-    return papers.length > 0 ? [{ name: 'included_papers', papers }] : undefined
+    return papers.length > 0 ? [paperListMemory('included_papers', papers)] : undefined
   }, [project])
+
+  // Every phase after scoping (and every phase's chat) gets the finalized scope spec as memory,
+  // once one exists, alongside the included papers.
+  const buildPhaseMemory = () => {
+    const memory = [...(includedPaperMemory ?? [])]
+    if (scopeSpecification) memory.push(scopingMemory(scopeSpecification))
+    return memory.length > 0 ? memory : undefined
+  }
 
   const appendTurn = useCallback((role, node) => {
     setConversation((prev) => [...prev, { id: crypto.randomUUID(), role, node }])
@@ -250,13 +267,18 @@ export default function ProjectWorkspace() {
 
   // Renders one phase agent's response as a transcript turn: its text on "completed"/"error",
   // or just the question text on "awaiting_input" (the interactive answer UI itself lives in
-  // `renderAgentBottom`, not the transcript).
+  // `renderAgentBottom`, not the transcript). Also captures the scoping phase's completed turn
+  // as the locally stored scope spec, if it parses as one (see `tryParseScope`).
   const appendPhaseResult = (result) => {
     if (!result.ok) {
       appendTurn('assistant', <p className="chat-error-text">{result.error}</p>)
       return
     }
     const { response } = result
+    if (agentFlow.phase?.key === 'scoping' && response.status === 'completed') {
+      const scope = tryParseScope(response.response)
+      if (scope) setScopeSpecification(scope)
+    }
     appendTurn('assistant', <p>{response.status === 'awaiting_input' ? response.question.question : response.response}</p>)
   }
 
@@ -265,36 +287,70 @@ export default function ProjectWorkspace() {
     const result = await phaseAgent.start(
       agentFlow.phase.stage,
       project.description,
-      includedPaperLists,
+      buildPhaseMemory(),
     )
     appendPhaseResult(result)
   }
 
   const handlePhaseMessage = async (text) => {
     appendTurn('user', <p>{text}</p>)
-    appendPhaseResult(await phaseAgent.send(text, includedPaperLists))
+    appendPhaseResult(await phaseAgent.send(text, buildPhaseMemory()))
   }
 
-  const handleContinuePhase = () => {
-    // Keep the last phase's conversation alive once done, so "Chat with AI" from the done
-    // state can still discuss its output; every other phase transition starts fresh.
-    if (agentFlow.phaseIndex < AGENT_PHASES.length - 1) {
-      phaseAgent.reset()
-      setPhaseStarted(false)
+  // Every phase starts itself automatically - there's no separate "confirm before starting"
+  // box, only the continue bar shown once a phase's questions are done.
+  useEffect(() => {
+    if (workspaceMode === 'agent' && project && agentFlow.phase && !phaseStarted) {
+      handleStartPhase()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceMode, project, agentFlow.phase, phaseStarted])
+
+  const handleContinuePhase = () => {
+    phaseAgent.reset()
+    phaseChatAgent.reset()
+    setPhaseStarted(false)
     agentFlow.advance()
   }
 
-  // In manual mode this talks to the standalone "chatbot" agent; in agent mode it's a follow-up
-  // turn in the current phase's own conversation, same as answering a question would be.
+  // "Chat with AI" during a phase talks to that phase's dedicated `<phase>_chat` stage, not the
+  // phase's own conversation - a fresh, separate conversation from `phaseAgent`. Falls back to
+  // the last real phase's chat stage once every phase is done (`agentFlow.phase` is null there).
+  // During scoping_chat specifically, a completed turn that parses as a scope spec (the agent
+  // applying a requested change) replaces the locally stored one, same as the scoping phase's own
+  // completion does.
+  const handlePhaseChatMessage = async (text) => {
+    appendTurn('user', <p>{text}</p>)
+    const chatPhase = agentFlow.phase ?? AGENT_PHASES[AGENT_PHASES.length - 1]
+    const memory = buildPhaseMemory()
+    const result =
+      phaseChatAgent.status === null
+        ? await phaseChatAgent.start(chatPhase.chatStage, text, memory)
+        : await phaseChatAgent.send(text, memory)
+
+    if (!result.ok) {
+      appendTurn('assistant', <p className="chat-error-text">{result.error}</p>)
+      return
+    }
+
+    const { response } = result
+    if (chatPhase.key === 'scoping' && response.status === 'completed') {
+      const scope = tryParseScope(response.response)
+      if (scope) setScopeSpecification(scope)
+    }
+    appendTurn('assistant', <p>{response.status === 'awaiting_input' ? response.question.question : response.response}</p>)
+  }
+
+  // In manual mode this talks to the standalone "chatbot" agent; in agent mode it's the current
+  // phase's dedicated chat conversation.
   const handleChatSend = async (text) => {
-    if (workspaceMode === 'agent') return handlePhaseMessage(text)
+    if (workspaceMode === 'agent') return handlePhaseChatMessage(text)
 
     appendTurn('user', <p>{text}</p>)
     const result =
       chatAgent.status === null
-        ? await chatAgent.start('chatbot', text, includedPaperLists)
-        : await chatAgent.send(text, includedPaperLists)
+        ? await chatAgent.start('chatbot', text, includedPaperMemory)
+        : await chatAgent.send(text, includedPaperMemory)
     if (result.ok) {
       appendTurn('assistant', <p>{result.response.response}</p>)
     } else {
@@ -320,11 +376,7 @@ export default function ProjectWorkspace() {
     }
 
     if (!phaseStarted) {
-      return (
-        <ChatTurn role="assistant" wide>
-          <AgentStepPrompt description={agentFlow.phase.description} onConfirm={handleStartPhase} />
-        </ChatTurn>
-      )
+      return null
     }
 
     if (phaseAgent.question) {
@@ -337,7 +389,7 @@ export default function ProjectWorkspace() {
 
     return (
       <ChatTurn role="assistant" wide>
-        <AgentContinueBar onContinue={handleContinuePhase} onChat={() => setChatOpen(true)} />
+        <AgentContinueBar hint={agentFlow.phase.nextHint} onContinue={handleContinuePhase} onChat={() => setChatOpen(true)} />
       </ChatTurn>
     )
   }
@@ -419,7 +471,7 @@ export default function ProjectWorkspace() {
           </ChatTurn>
         ))}
 
-        {chatAgent.sending && (
+        {(workspaceMode === 'agent' ? phaseChatAgent.sending : chatAgent.sending) && (
           <ChatTurn role="assistant" wide>
             <p className="chat-thinking">Thinking…</p>
           </ChatTurn>
@@ -438,7 +490,7 @@ export default function ProjectWorkspace() {
       {chatOpen && (
         <ChatComposer
           onSend={handleChatSend}
-          disabled={workspaceMode === 'agent' ? phaseAgent.sending : chatAgent.sending}
+          disabled={workspaceMode === 'agent' ? phaseAgent.sending || phaseChatAgent.sending : chatAgent.sending}
           placeholder="Ask about the collected findings…"
         />
       )}

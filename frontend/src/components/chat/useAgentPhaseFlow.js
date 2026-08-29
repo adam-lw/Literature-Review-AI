@@ -7,20 +7,27 @@ export const AGENT_PHASES = [
   {
     key: 'scoping',
     stage: 'scoping',
+    // Backend stage "Chat with AI" talks to during this phase - a separate agent conversation
+    // from `stage`, seeded with the scope spec once one exists (see `scopeMemory.js`).
+    chatStage: 'scoping_chat',
     label: 'Scoping',
-    description: 'Define the scope of this literature review.',
+    // Shown in the continue bar once this phase's questions are done, describing what
+    // continuing moves on to.
+    nextHint: 'Continue to paper discovery, or chat with the AI to further refine your scope first.',
   },
   {
     key: 'search_review',
     stage: 'search_review',
+    chatStage: 'review_chat',
     label: 'Search & review',
-    description: 'Search the literature and evaluate candidate papers against the inclusion/exclusion criteria.',
+    nextHint: 'Continue to writing, or chat with the AI to review the search results first.',
   },
   {
     key: 'writing',
     stage: 'writing',
+    chatStage: 'writing_chat',
     label: 'Writing',
-    description: 'Write the full literature review.',
+    nextHint: 'Finish up, or chat with the AI to revise the review first.',
   },
 ]
 
