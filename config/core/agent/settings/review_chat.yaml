@@ -1,0 +1,19 @@
+# Agent settings for the "review_chat" agent. STUB — review before relying on this agent.
+#
+# tools: list of registered tool names this agent may call. Omit the key
+#   entirely (or delete this file) to give the agent every registered tool.
+# llm: model name to run the agent on.
+# allow_questions: whether the agent may pause and ask the user a clarifying
+#   question via the `ask_user` tool.
+
+tools:
+  - vector_search
+  - retrieve_paper
+  - search_papers
+  - retrieve_scope
+  - retrieve_review
+  - record_criterion_review
+  - finalize_review
+  - delete_review
+llm: dummy
+allow_questions: true
