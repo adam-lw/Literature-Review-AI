@@ -16,6 +16,7 @@ from literature_ai.agent_service.agent.memory import (
     MemoryObject,
     PaperMemoryObject,
     PaperRecord,
+    ScopingMemoryObject,
 )
 from literature_ai.agent_service.api.models import (
     AgentQuestion,
@@ -23,30 +24,52 @@ from literature_ai.agent_service.api.models import (
     CreateAgentRequest,
     InvokeAgentRequest,
     InvokeAgentResponse,
-    PaperList,
+    MemoryInput,
+    PaperListMemoryInput,
+    ScopingMemoryInput,
 )
 
 router = APIRouter(prefix="/invoke-agent", tags=["agent"])
 
 
-def _build_memory(paper_lists: Optional[list[PaperList]]) -> dict[str, MemoryObject]:
+def _build_memory(memory_inputs: Optional[list[MemoryInput]]) -> dict[str, MemoryObject]:
     """
-    Builds a single `PaperMemoryObject` spanning every paper across the
-    request's paper lists, keyed by paper id. Only `title`/`abstract` are
-    carried into memory - the rest of each paper's metadata already lives in
-    the request/DB and isn't what `retrieve_findings` is for.
+    Converts a request's generic `memory` inputs into the `dict[str,
+    MemoryObject]` shape `spawn_agent`/`resume_agent` load onto the agent.
+    Dispatches on each input's `type` discriminator to the matching
+    `MemoryObject` subclass - add a case here (and a variant on `MemoryInput`
+    in `api/models.py`) for each new memory type a request should be able to
+    seed.
+
+    All `paper_list` inputs merge into a single `PaperMemoryObject` keyed
+    "papers", keyed by paper id, matching what `retrieve_paper` (and
+    `ReactAgent`'s type-based memory lookup, which uses the first object of a
+    matching type it finds) expects. Only `title`/`abstract` are carried into
+    memory - the rest of each paper's metadata already lives in the
+    request/DB and isn't what `retrieve_paper` is for.
     """
-    papers_memory = PaperMemoryObject(id="papers")
-    for paper_list in paper_lists or []:
-        for paper in paper_list.papers:
-            papers_memory.papers[paper.paperId] = PaperRecord(
-                title=paper.title,
-                abstract=paper.abstract,
+    memory: dict[str, MemoryObject] = {}
+    papers_memory: Optional[PaperMemoryObject] = None
+
+    for item in memory_inputs or []:
+        if isinstance(item, PaperListMemoryInput):
+            if papers_memory is None:
+                papers_memory = PaperMemoryObject(id="papers")
+                memory[papers_memory.id] = papers_memory
+            for paper in item.papers:
+                papers_memory.papers[paper.paperId] = PaperRecord(
+                    title=paper.title,
+                    abstract=paper.abstract,
+                )
+        elif isinstance(item, ScopingMemoryInput):
+            memory["scoping"] = ScopingMemoryObject(
+                id="scoping", specification=item.specification
             )
 
-    if not papers_memory.papers:
-        return {}
-    return {papers_memory.id: papers_memory}
+    if papers_memory is not None and not papers_memory.papers:
+        del memory[papers_memory.id]
+
+    return memory
 
 
 def _to_response(agent_response: AgentResponse) -> InvokeAgentResponse:
@@ -89,7 +112,7 @@ async def create_agent(request: CreateAgentRequest) -> InvokeAgentResponse:
 
     """
     with propagate_attributes(session_id=request.session_id, tags=[request.stage]):
-        memory = _build_memory(request.paper_lists)
+        memory = _build_memory(request.memory)
 
         try:
             agent_response = await spawn_agent(
@@ -114,7 +137,7 @@ async def invoke_agent(request: InvokeAgentRequest) -> InvokeAgentResponse:
     with propagate_attributes(session_id=request.session_id, tags=[request.stage]):
         history = Messages([m.model_dump() for m in request.messages[:-1]])
         instruction = request.messages[-1].content
-        memory = _build_memory(request.paper_lists)
+        memory = _build_memory(request.memory)
 
         try:
             agent_response = await resume_agent(
