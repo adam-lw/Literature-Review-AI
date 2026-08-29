@@ -63,19 +63,24 @@ class ReactAgent:
                     self.context, tools=list(self.tools.values())
                 )
 
-                if isinstance(result, str):
-                    self.context.add(result, role="assistant")
+                if result.content:
+                    self.context.add(result.content, role="assistant")
+
+                if not result.tool_calls:
                     return AgentResponse(
                         status="completed",
                         state=self.context,
-                        result=Message(role="assistant", content=result),
+                        result=Message(
+                            role="assistant", content=result.content or ""
+                        ),
                     )
 
                 # Handle tool calls in result
                 logger.debug(
-                    f"LLM requested {len(result)} tool call(s): {[tc.name for tc in result]}"
+                    f"LLM requested {len(result.tool_calls)} tool call(s): "
+                    f"{[tc.name for tc in result.tool_calls]}"
                 )
-                for tool_call in result:
+                for tool_call in result.tool_calls:
                     self.context.add(
                         f"Called tool `{tool_call.name}` with arguments {tool_call.arguments}",
                         role="assistant",
