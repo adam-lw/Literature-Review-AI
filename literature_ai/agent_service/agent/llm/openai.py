@@ -1,9 +1,9 @@
 from dotenv import load_dotenv
-from literature_ai.agent_service.agent.llm.core import LLM, Messages
+from literature_ai.agent_service.agent.llm.core import LLM, LLMResponse, Messages
 from literature_ai.agent_service.agent.tools import Tool, ToolCall
 import json
 import os
-from typing import Any, Mapping, Optional, Union, cast
+from typing import Any, Mapping, Optional, cast
 
 from openai import AsyncOpenAI, omit
 from openai.types.responses import FunctionToolParam
@@ -51,7 +51,7 @@ class OpenAiLLM(LLM):
 
     async def call(
         self, messages: Messages, tools: Optional[list[Tool]] = None
-    ) -> Union[str, list[ToolCall]]:
+    ) -> LLMResponse:
         messages_text = "\n".join(f"{m.role}: {m.content}" for m in messages)
 
         config = cast(Mapping[str, Any], self.config)
@@ -70,7 +70,7 @@ class OpenAiLLM(LLM):
             for item in response.output
             if item.type == "function_call"
         ]
-        if tool_calls:
-            return tool_calls
 
-        return response.output_text
+        return LLMResponse(
+            content=response.output_text or None, tool_calls=tool_calls or None
+        )

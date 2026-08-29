@@ -1,6 +1,6 @@
-from literature_ai.agent_service.agent.llm.core import LLM, Messages
+from literature_ai.agent_service.agent.llm.core import LLM, LLMResponse, Messages
 from literature_ai.agent_service.agent.tools import Tool, ToolCall
-from typing import Any, Optional, Union, cast
+from typing import Any, Optional, cast
 from anthropic import AsyncAnthropic, omit
 from anthropic.types import MessageParam, TextBlock, ToolParam, ToolUseBlock
 import os
@@ -47,7 +47,7 @@ class AnthropicLLM(LLM):
 
     async def call(
         self, messages: Messages, tools: Optional[list[Tool]] = None
-    ) -> Union[str, list[ToolCall]]:
+    ) -> LLMResponse:
         anthropic_messages = cast(list[MessageParam], messages.to_list())
 
         response = await self.client.messages.create(
@@ -67,12 +67,9 @@ class AnthropicLLM(LLM):
             for block in response.content
             if isinstance(block, ToolUseBlock)
         ]
-        if tool_calls:
-            return tool_calls
 
-        # Extract text safely
-        for block in response.content:
-            if isinstance(block, TextBlock):
-                return block.text
+        content = "\n".join(
+            block.text for block in response.content if isinstance(block, TextBlock)
+        )
 
-        raise RuntimeError("No text block returned from Anthropic response")
+        return LLMResponse(content=content or None, tool_calls=tool_calls or None)

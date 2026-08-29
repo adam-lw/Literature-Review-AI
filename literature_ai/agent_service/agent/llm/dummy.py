@@ -1,7 +1,7 @@
-from typing import Optional, Union
+from typing import Optional
 
-from literature_ai.agent_service.agent.llm.core import LLM, Messages
-from literature_ai.agent_service.agent.tools import Tool, ToolCall
+from literature_ai.agent_service.agent.llm.core import LLM, LLMResponse, Messages
+from literature_ai.agent_service.agent.tools import Tool
 
 
 class DummyLLM(LLM):
@@ -22,6 +22,6 @@ class DummyLLM(LLM):
 
     async def call(
         self, messages: Messages, tools: Optional[list[Tool]] = None
-    ) -> Union[str, list[ToolCall]]:
+    ) -> LLMResponse:
         last = messages[-1] if len(messages) else None
-        return f"[dummy] {last.content if last else ''}"
+        return LLMResponse(content=f"[dummy] {last.content if last else ''}")

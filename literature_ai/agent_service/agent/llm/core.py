@@ -18,6 +18,21 @@ class Message:
         return {"role": self.role, "content": self.content}
 
 
+@dataclass
+class LLMResponse:
+    """
+    The result of a single `LLM.call`.
+
+    `content` holds the model's text response (reasoning and/or a final
+    answer), and `tool_calls` holds any tools the model chose to invoke.
+    Both may be populated at once - a model can emit reasoning text
+    alongside a tool call in the same turn.
+    """
+
+    content: Optional[str] = None
+    tool_calls: Optional[list[ToolCall]] = None
+
+
 MessageLike = Union[Message, dict[str, str], str, "Messages"]
 
 
@@ -108,12 +123,13 @@ class LLM(ABC):
     @abstractmethod
     async def call(
         self, messages: Messages, tools: Optional[list[Tool]] = None
-    ) -> Union[str, list[ToolCall]]:
+    ) -> LLMResponse:
         """
         Abstract method for calling an LLM.
 
-        Returns the model's text response, or a list of `ToolCall`s if the
-        model chose to call one or more of the supplied `tools` instead.
+        Returns an `LLMResponse` carrying the model's text response, any
+        `ToolCall`s the model chose to make against the supplied `tools`, or
+        both at once.
         """
         ...
 
@@ -124,7 +140,7 @@ class LLM(ABC):
 
     def call_sync(
         self, messages: Messages, tools: Optional[list[Tool]] = None
-    ) -> Union[str, list[ToolCall]]:
+    ) -> LLMResponse:
         """Helper method for synchronous calling of `call`"""
         return asyncio.run(self.call(messages, tools=tools))
 

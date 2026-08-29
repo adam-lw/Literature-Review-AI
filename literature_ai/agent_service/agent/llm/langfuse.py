@@ -1,16 +1,14 @@
 from dataclasses import asdict
-from typing import Any, Optional, Union
+from typing import Any, Optional
 
 from langfuse import get_client
 
-from literature_ai.agent_service.agent.llm.core import LLM, Messages
-from literature_ai.agent_service.agent.tools import Tool, ToolCall
+from literature_ai.agent_service.agent.llm.core import LLM, LLMResponse, Messages
+from literature_ai.agent_service.agent.tools import Tool
 
 
-def _serialize_response(response: Union[str, list[ToolCall]]) -> Any:
-    if isinstance(response, list):
-        return [asdict(tc) for tc in response]
-    return response
+def _serialize_response(response: LLMResponse) -> Any:
+    return asdict(response)
 
 
 class LangfuseLLM(LLM):
@@ -30,7 +28,7 @@ class LangfuseLLM(LLM):
 
     async def call(
         self, messages: Messages, tools: Optional[list[Tool]] = None
-    ) -> Union[str, list[ToolCall]]:
+    ) -> LLMResponse:
         client = get_client()
         model = getattr(self._llm, "model", "unknown")
 
