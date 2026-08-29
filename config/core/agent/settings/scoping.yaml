@@ -6,5 +6,9 @@
 # allow_questions: whether the agent may pause and ask the user a clarifying
 #   question via the `ask_user` tool.
 
+# No tools: per scoping.md, this agent only interrogates the user and emits
+# the finalized specification as its own response text - it does not search
+# for papers, screen results, or read/write any memory object.
+tools: []
 llm: dummy
 allow_questions: true

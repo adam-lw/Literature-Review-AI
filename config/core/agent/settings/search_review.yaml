@@ -8,6 +8,12 @@
 
 tools:
   - vector_search
-  - retrieve_findings
+  - retrieve_paper
+  - search_papers
+  - retrieve_scope
+  - retrieve_review
+  - record_criterion_review
+  - finalize_review
+  - delete_review
 llm: dummy
 allow_questions: true
