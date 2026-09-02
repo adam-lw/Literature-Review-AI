@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TEI xmlns="http://www.tei-c.org/ns/1.0">
+    <teiHeader>
+        <fileDesc>
+            <titleStmt>
+                <title level="a" type="main">Attention Is All You Need</title>
+            </titleStmt>
+        </fileDesc>
+        <encodingDesc>
+            <appInfo>
+                <application version="0.8.2" ident="GROBID" when="2026-01-01T00:00+0000">
+                    <ref target="https://github.com/kermitt2/grobid">GROBID</ref>
+                </application>
+            </appInfo>
+        </encodingDesc>
+        <profileDesc>
+            <abstract>
+                <div xmlns="http://www.tei-c.org/ns/1.0">
+                    <p>The dominant sequence transduction models are based on complex
+                        recurrent or convolutional neural networks.</p>
+                </div>
+            </abstract>
+        </profileDesc>
+    </teiHeader>
+    <text xml:lang="en">
+        <body>
+            <div xmlns="http://www.tei-c.org/ns/1.0">
+                <head>Introduction</head>
+                <p>Recurrent neural networks have been firmly established as state of the
+                    art approaches in sequence modeling.</p>
+                <p>Numerous efforts have since continued to push the boundaries of recurrent
+                    language models.</p>
+            </div>
+            <div xmlns="http://www.tei-c.org/ns/1.0">
+                <head>Background</head>
+                <p>The goal of reducing sequential computation also forms the foundation of
+                    several other model families.</p>
+            </div>
+            <div xmlns="http://www.tei-c.org/ns/1.0">
+                <p>A paragraph with no section heading.</p>
+            </div>
+        </body>
+    </text>
+</TEI>
