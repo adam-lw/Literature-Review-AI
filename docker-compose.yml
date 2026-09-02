@@ -15,6 +15,30 @@ services:
       timeout: 5s
       retries: 10
 
+  grobid:
+    # Lightweight rule-based image by default (much lower RAM than the full deep-learning
+    # variant, at the cost of noticeably worse section/reference detection). Set
+    # GROBID_IMAGE_TAG=0.8.2 in .env for the full deep-learning variant instead (best parse
+    # quality, ~4GB RAM) — same REST API either way, so nothing else needs to change.
+    image: lfoppiano/grobid:${GROBID_IMAGE_TAG:-0.8.2-crf}
+    ports:
+      - "8070:8070"
+    healthcheck:
+      # The image has neither curl nor wget (Debian-slim JRE base). CMD-SHELL runs via
+      # /bin/sh (dash), which doesn't support /dev/tcp, so invoke bash explicitly and
+      # check for a 200 status line in the raw HTTP response.
+      test:
+        [
+          "CMD",
+          "bash",
+          "-c",
+          'exec 3<>/dev/tcp/localhost/8070 && printf "GET /api/isalive HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n" >&3 && cat <&3 | grep -q "200"',
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 90s
+
   api:
     build: .
     env_file:
@@ -25,6 +49,7 @@ services:
       PGUSER: literature_ai
       PGPASSWORD: literature_ai
       PGDATABASE: literature_ai
+      GROBID_URL: http://grobid:8070
     ports:
       - "8000:8000"
     volumes:
@@ -32,6 +57,8 @@ services:
       - api_venv:/opt/venv
     depends_on:
       postgres:
+        condition: service_healthy
+      grobid:
         condition: service_healthy
 
   frontend:
