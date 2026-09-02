@@ -2,6 +2,7 @@ from loguru import logger
 from sqlalchemy import text
 
 from literature_ai.db import ENGINE
+from literature_ai.search_service.processing.utils import TARGET_TABLES
 
 _OPS = {
     "cosine": "vector_cosine_ops",
@@ -16,11 +17,12 @@ def create_hnsw_index(
     ef_construction: int = 64,
     distance: str = "cosine",
 ) -> str:
-    """Create a partial HNSW index on abstract_embeddings for the given run_id.
+    """Create a partial HNSW index for the given run_id.
 
     The index covers only rows where run_id matches, using the vector column
-    determined by the run's n_dim. Idempotent — safe to call multiple times.
-    Returns the index name.
+    determined by the run's n_dim, on whichever embeddings table matches the run's
+    target (abstract_embeddings or chunk_embeddings). Idempotent — safe to call
+    multiple times. Returns the index name.
     """
     if distance not in _OPS:
         raise ValueError(f"distance must be one of {list(_OPS)}, got {distance!r}")
@@ -30,7 +32,7 @@ def create_hnsw_index(
     with ENGINE.connect() as conn:
         row = conn.execute(
             text(
-                "SELECT n_dim FROM processed.embedding_runs_metadata WHERE run_id = :rid"
+                "SELECT n_dim, target FROM processed.embedding_runs_metadata WHERE run_id = :rid"
             ),
             {"rid": run_id},
         ).fetchone()
@@ -38,13 +40,14 @@ def create_hnsw_index(
     if row is None:
         raise ValueError(f"No embedding run found for run_id={run_id!r}")
 
-    n_dim = row[0]
+    n_dim, target = row
+    table = TARGET_TABLES[target]
     embedding_col = f"embedding_{n_dim}"
     index_name = f"hnsw_{run_id}"
 
     ddl = (
         f'CREATE INDEX IF NOT EXISTS "{index_name}" '
-        f"ON processed.abstract_embeddings "
+        f"ON {table} "
         f'USING hnsw ("{embedding_col}" {ops}) '
         f"WITH (m = {m}, ef_construction = {ef_construction}) "
         f"WHERE run_id = {run_id}"
@@ -52,9 +55,7 @@ def create_hnsw_index(
 
     with ENGINE.connect() as conn:
         n_rows = conn.execute(
-            text(
-                "SELECT COUNT(*) FROM processed.abstract_embeddings WHERE run_id = :rid"
-            ),
+            text(f"SELECT COUNT(*) FROM {table} WHERE run_id = :rid"),
             {"rid": run_id},
         ).scalar()
 

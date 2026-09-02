@@ -5,12 +5,22 @@ from sqlalchemy import text
 
 from literature_ai.db import ENGINE
 
+# Physical embeddings table for each run "target". Shared run bookkeeping
+# (embedding_runs_metadata) distinguishes abstract vs. chunk runs via a "target"
+# column, but each target's vectors live in its own table (abstract_embeddings is
+# keyed one-row-per-paper, which can't represent many chunks per paper).
+TARGET_TABLES: dict[str, str] = {
+    "abstract": "processed.abstract_embeddings",
+    "chunk": "processed.chunk_embeddings",
+}
+
 
 def resolve_embedding_run(
     model_name: str,
     model_version: str | None,
     n_dim: int | None = None,
     user_tags: dict | None = None,
+    target: Literal["abstract", "chunk"] = "abstract",
 ) -> tuple[int, int]:
     """Resolve an existing embedding run to its run_id and n_dim.
 
@@ -29,6 +39,9 @@ def resolve_embedding_run(
     user_tags : dict or None
         When provided, only rows whose ``user_tags`` exactly match are
         considered. When ``None``, rows with any tag set are included.
+    target : {"abstract", "chunk"}
+        Whether to resolve an abstract-embedding run or a chunk-embedding run.
+        Defaults to ``"abstract"`` to preserve existing callers' behavior.
 
     Returns
     -------
@@ -50,6 +63,7 @@ def resolve_embedding_run(
         FROM processed.embedding_runs_metadata
         WHERE embedding_model = :model
           AND embedding_version IS NOT DISTINCT FROM :version
+          AND target = :target
           AND (:n_dim IS NULL OR n_dim = :n_dim)
           AND (:tags IS NULL OR user_tags = CAST(:tags AS jsonb))
     """)
@@ -59,6 +73,7 @@ def resolve_embedding_run(
             {
                 "model": model_name,
                 "version": model_version,
+                "target": target,
                 "n_dim": n_dim,
                 "tags": tags_json,
             },
@@ -84,7 +99,7 @@ def resolve_embedding_run(
 
 
 def verify_index(run_id: int) -> None:
-    """Verify that an HNSW index exists on abstract_embeddings for the given run_id.
+    """Verify that an HNSW index exists on the run's embeddings table for the given run_id.
 
     Parameters
     ----------
@@ -94,18 +109,27 @@ def verify_index(run_id: int) -> None:
     Raises
     ------
     ValueError
-        If no index named ``hnsw_{run_id}`` exists on
-        ``processed.abstract_embeddings``.
+        If no matching run exists, or if no index named ``hnsw_{run_id}`` exists on
+        the resolved embeddings table (``processed.abstract_embeddings`` or
+        ``processed.chunk_embeddings``, depending on the run's ``target``).
     """
     with ENGINE.connect() as conn:
+        meta_row = conn.execute(
+            text("SELECT target FROM processed.embedding_runs_metadata WHERE run_id = :rid"),
+            {"rid": run_id},
+        ).fetchone()
+        if meta_row is None:
+            raise ValueError(f"No embedding run found for run_id={run_id!r}")
+        table_name = TARGET_TABLES[meta_row[0]].split(".")[-1]
+
         row = conn.execute(
             text("""
                 SELECT indexname FROM pg_indexes
                 WHERE schemaname = 'processed'
-                  AND tablename = 'abstract_embeddings'
+                  AND tablename = :table_name
                   AND indexname = 'hnsw_' || :run_id
             """),
-            {"run_id": run_id},
+            {"run_id": run_id, "table_name": table_name},
         ).fetchone()
     if row is None:
         raise ValueError(
@@ -120,6 +144,7 @@ def create_embedding_run(
     n_dim: int,
     user_tags: dict,
     source: Literal["collect", "generate"],
+    target: Literal["abstract", "chunk"] = "abstract",
 ) -> int:
     """Create a new embedding run row and return its run_id.
 
@@ -136,6 +161,10 @@ def create_embedding_run(
     source : {"collect", "generate"}
         Whether embeddings were collected from an external API or generated
         locally.
+    target : {"abstract", "chunk"}
+        Whether this run is for abstract embeddings or full-paper-chunk
+        embeddings. Defaults to ``"abstract"`` to preserve existing callers'
+        behavior.
 
     Returns
     -------
@@ -155,12 +184,13 @@ def create_embedding_run(
           AND n_dim = :n_dim
           AND user_tags = CAST(:tags AS jsonb)
           AND source = :source
+          AND target = :target
         LIMIT 1
     """)
     insert_sql = text("""
         INSERT INTO processed.embedding_runs_metadata
-            (embedding_model, embedding_version, n_dim, user_tags, source)
-        VALUES (:model, :version, :n_dim, CAST(:tags AS jsonb), :source)
+            (embedding_model, embedding_version, n_dim, user_tags, source, target)
+        VALUES (:model, :version, :n_dim, CAST(:tags AS jsonb), :source, :target)
         RETURNING run_id
     """)
     params = {
@@ -169,6 +199,7 @@ def create_embedding_run(
         "n_dim": n_dim,
         "tags": tags_json,
         "source": source,
+        "target": target,
     }
     with ENGINE.begin() as conn:
         existing = conn.execute(check_sql, params).fetchone()
