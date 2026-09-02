@@ -14,6 +14,12 @@ from literature_ai.agent_service.agent.tools import register_all_tools
 from literature_ai.search_service.api.routers.embedding_models import (
     router as embedding_models_router,
 )
+from literature_ai.search_service.api.routers.full_paper import (
+    router as full_paper_router,
+)
+from literature_ai.search_service.api.routers.rag_paper_chunks import (
+    router as rag_paper_chunks_router,
+)
 from literature_ai.agent_service.api.routers.invoke_agent import (
     router as invoke_agent_router,
 )
@@ -36,6 +42,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Literature AI", lifespan=lifespan)
 
 app.include_router(embedding_models_router, prefix="/api")
+app.include_router(full_paper_router, prefix="/api")
+app.include_router(rag_paper_chunks_router, prefix="/api")
 app.include_router(invoke_agent_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
