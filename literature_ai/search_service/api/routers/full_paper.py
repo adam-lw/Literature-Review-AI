@@ -13,7 +13,7 @@ from literature_ai.search_service.full_paper.service import (
     PdfDownloadError,
     get_or_create_full_paper,
 )
-from literature_ai.search_service.parsing.grobid_client import extract_sections
+from literature_ai.search_service.processing.pdf_parsing import extract_sections
 
 router = APIRouter(prefix="/full-paper", tags=["full-paper"])
 
@@ -74,7 +74,7 @@ def list_paper_sections(paper_id: str) -> PaperSectionsResponse:
     return PaperSectionsResponse(
         paperId=paper_id,
         sections=[
-            PaperSectionHeader(index=s.index, header=s.header) for s in sections if s.header
+            PaperSectionHeader(index=s["index"], header=s["header"]) for s in sections if s["header"]
         ],
     )
 
@@ -83,7 +83,7 @@ def list_paper_sections(paper_id: str) -> PaperSectionsResponse:
 def get_paper_section(paper_id: str, index: int) -> PaperSectionResponse:
     """Retrieve one section's text by its index, as returned by `list_paper_sections`."""
     sections = _get_sections(paper_id)
-    section = next((s for s in sections if s.index == index), None)
+    section = next((s for s in sections if s["index"] == index), None)
     if section is None:
         raise HTTPException(
             status_code=404,
@@ -91,7 +91,7 @@ def get_paper_section(paper_id: str, index: int) -> PaperSectionResponse:
         )
     return PaperSectionResponse(
         paperId=paper_id,
-        index=section.index,
-        header=section.header,
-        section_text="\n\n".join(section.paragraphs),
+        index=section["index"],
+        header=section["header"],
+        section_text="\n\n".join(section["paragraphs"]),
     )

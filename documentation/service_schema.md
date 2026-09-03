@@ -68,27 +68,18 @@ erDiagram
         INTEGER chunk_index PK
         INTEGER section_index
         TEXT section_header
-        TEXT chunk_text
+        INTEGER start_index
+        INTEGER end_index
         INTEGER char_count
-        TEXT content_hash
+        VECTOR embedding
         TIMESTAMPTZ chunked_at
-    }
-
-    chunk_embeddings {
-        TEXT paperId PK, FK
-        INTEGER chunk_index PK, FK
-        BIGINT run_id PK, FK
-        TIMESTAMPTZ processed_at
-        TEXT content_hash
     }
 
     raw_paper_searches ||--o| paper_fulltext : "paperId (optional GROBID-parsed full text)"
     raw_paper_searches ||--o| processed_abstracts : "paperId (1:1 cleaned abstract)"
     raw_paper_searches ||--o{ abstract_embeddings : "paperId (many embeddings per paper)"
-    raw_paper_searches ||--o{ paper_chunks : "paperId (many chunks per paper, on demand)"
+    raw_paper_searches ||--o{ paper_chunks : "paperId (many chunks per paper)"
     embedding_runs_metadata ||--o{ abstract_embeddings : "run_id, target='abstract'"
-    embedding_runs_metadata ||--o{ chunk_embeddings : "run_id, target='chunk'"
-    paper_chunks ||--o{ chunk_embeddings : "(paperId, chunk_index), many embeddings per chunk"
 ```
 
 ## Schema overview
@@ -109,5 +100,4 @@ Two PostgreSQL schemas organise the tables:
 | `processed_abstracts` | `processed` | Cleaned and enriched abstracts. Strict 1:1 with `raw_paper_searches`. |
 | `embedding_runs_metadata` | `processed` | One row per distinct embedding run (model + version + dims + tags + target). Shared between abstract and chunk embedding runs; `target` (`abstract` or `chunk`) disambiguates which physical embeddings table a run's vectors live in. Has a unique index to deduplicate runs. |
 | `abstract_embeddings` | `processed` | Abstract embedding vectors. One row per (paperId, run_id). Embedding vector columns (e.g. `embedding_768 VECTOR(768)`) are added dynamically via `ALTER TABLE` when a new model dimension is first seen. |
-| `paper_chunks` | `processed` | Full-paper text chunked from GROBID-parsed body text. One row per (paperId, chunk_index), computed on demand the first time a paper is requested for chunk-scoped RAG search. Immutable once written (no incremental re-chunk); a manual delete forces re-chunking. |
-| `chunk_embeddings` | `processed` | Chunk embedding vectors. One row per (paperId, chunk_index, run_id). Cannot reuse `abstract_embeddings` (whose PK is one row per paper); shares `embedding_runs_metadata` (via `target='chunk'`) and the same dynamic `embedding_{n_dim}` column pattern. FK to `paper_chunks` is `ON DELETE CASCADE`. |
+| `paper_chunks` | `processed` | Full-paper text chunked from GROBID-parsed body text. One row per (paperId, chunk_index). Stores no text of its own - `start_index`/`end_index` are character offsets into the parent `paper_fulltext.full_text` row, substringed out on read. `embedding` is a single fixed-model vector (`text-embedding-3-small`, 1536 dims), computed once by `process_papers_by_id` - no per-run/multi-model tracking like `abstract_embeddings`. Immutable once written; a manual delete forces re-chunking. |

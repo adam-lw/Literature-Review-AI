@@ -92,3 +92,26 @@ class PaperSectionHeader(BaseModel):
 class PaperSectionsResponse(BaseModel):
     paperId: str
     sections: list[PaperSectionHeader]
+
+
+class KeywordSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    n_results: int = Field(10, ge=1, le=100)
+
+
+class KeywordSearchResult(BaseModel):
+    paperId: str
+    title: Optional[str] = None
+    abstract: Optional[str] = None
+    year: Optional[int] = None
+    venue: Optional[str] = None
+    citationCount: Optional[int] = None
+    url: Optional[str] = None
+    DOI: Optional[str] = None
+    rank: float
+
+
+class KeywordSearchResponse(BaseModel):
+    query: str
+    n_results: int
+    results: list[KeywordSearchResult]

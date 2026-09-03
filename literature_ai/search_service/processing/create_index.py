@@ -69,3 +69,21 @@ def create_hnsw_index(
 
     logger.info(f"HNSW index {index_name!r} ready")
     return index_name
+
+
+def create_keyword_search_index() -> str:
+    """Create the GIN index on abstract_keyword_vectors.search_vector.
+
+    Idempotent — safe to call multiple times. Returns the index name.
+    """
+    index_name = "abstract_keyword_vectors_search_vector_idx"
+    ddl = (
+        f'CREATE INDEX IF NOT EXISTS "{index_name}" '
+        f'ON processed.abstract_keyword_vectors USING GIN ("search_vector")'
+    )
+
+    with ENGINE.begin() as conn:
+        conn.execute(text(ddl))
+
+    logger.info(f"Keyword search GIN index {index_name!r} ready")
+    return index_name

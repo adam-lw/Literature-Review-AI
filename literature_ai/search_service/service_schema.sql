@@ -57,7 +57,22 @@ CREATE TABLE IF NOT EXISTS processed.processed_abstracts (
     "processed_at"      TIMESTAMP WITH TIME ZONE
 );
 
--- Metadata for each distinct embedding run (unique combination of model + version + dims + tags).
+-- Postgres full-text search vectors derived from processed.processed_abstracts
+-- (title+abstract), built incrementally by processing/build_keyword_vectors.py.
+-- Separate 1:1 table rather than a column on processed_abstracts itself, mirroring
+-- abstract_embeddings' relationship to processed_abstracts. Title weighted 'A'
+-- (higher), abstract 'B'. GIN index created via processing/create_index.py's
+-- create_keyword_search_index(), same workflow as the HNSW indices below.
+CREATE TABLE IF NOT EXISTS processed.abstract_keyword_vectors (
+    "paperId"       TEXT PRIMARY KEY REFERENCES processed.processed_abstracts("paperId"),
+    "search_vector" tsvector NOT NULL,
+    "content_hash"  TEXT,
+    "processed_at"  TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+-- Metadata for each distinct embedding run (unique combination of model + version +
+-- dims + tags + target). "target" distinguishes abstract-embedding runs from
+-- full-paper-chunk-embedding runs sharing this table.
 CREATE TABLE IF NOT EXISTS processed.embedding_runs_metadata (
     "run_id"            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "ran_at"            TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -65,22 +80,11 @@ CREATE TABLE IF NOT EXISTS processed.embedding_runs_metadata (
     "embedding_version" TEXT,
     "n_dim"             INTEGER NOT NULL,
     "user_tags"         JSONB NOT NULL DEFAULT '{}',
-    "source"            TEXT NOT NULL CHECK ("source" IN ('collect', 'generate'))
+    "source"            TEXT NOT NULL CHECK ("source" IN ('collect', 'generate')),
+    "target"            TEXT NOT NULL DEFAULT 'abstract' CHECK ("target" IN ('abstract', 'chunk'))
 );
 
--- Discriminates abstract-embedding runs from full-paper-chunk-embedding runs sharing
--- this same run-bookkeeping table. Existing rows default to 'abstract' since every run
--- created before this column existed was an abstract run.
-ALTER TABLE processed.embedding_runs_metadata
-    ADD COLUMN IF NOT EXISTS "target" TEXT NOT NULL DEFAULT 'abstract'
-        CHECK ("target" IN ('abstract', 'chunk'));
-
--- Handles NULL embedding_version correctly via COALESCE. Rebuilt (rather than just
--- ALTERed) to include target: without it, an abstract run and a chunk run sharing the
--- same model/version/n_dim/tags/source would wrongly collide as duplicates. This table
--- is tiny (one row per experiment run), so dropping and recreating the index on every
--- apply_schema() call (i.e. every app startup) is cheap.
-DROP INDEX IF EXISTS processed.embedding_runs_metadata_unique;
+-- Handles NULL embedding_version correctly via COALESCE.
 CREATE UNIQUE INDEX IF NOT EXISTS embedding_runs_metadata_unique
     ON processed.embedding_runs_metadata (
         "target",
@@ -101,39 +105,19 @@ CREATE TABLE IF NOT EXISTS processed.abstract_embeddings (
     PRIMARY KEY ("paperId", "run_id")
 );
 
--- Chunked full-paper text, split from GROBID-parsed body text (raw.paper_fulltext).
--- One row per (paperId, chunk_index), computed on demand the first time a paper is
--- requested for chunk-scoped RAG search. There is no content-hash-based incremental
--- update here (unlike abstract_embeddings): raw.paper_fulltext.full_text never changes
--- after first parse, so "any rows exist for paperId" is a sufficient cache check.
--- Re-chunking (e.g. after a chunking-algorithm change) is a manual delete of a
--- paper's rows here (there is no automatic invalidation, matching
--- raw.paper_fulltext's own lack of one).
+-- One row per chunk. Chunks don't store their own text - "start_index"/"end_index" are
+-- character offsets into the parent raw.paper_fulltext.full_text row, substringed out on
+-- read. "embedding" is a single fixed-model vector (text-embedding-3-small, 1536 dims) -
+-- unlike abstract_embeddings, there's no per-run/multi-model tracking here.
 CREATE TABLE IF NOT EXISTS processed.paper_chunks (
     "paperId"        TEXT NOT NULL REFERENCES raw.raw_paper_searches("paperId"),
     "chunk_index"    INTEGER NOT NULL,
     "section_index"  INTEGER,
     "section_header" TEXT,
-    "chunk_text"     TEXT NOT NULL,
+    "start_index"    INTEGER NOT NULL,
+    "end_index"      INTEGER NOT NULL,
     "char_count"     INTEGER NOT NULL,
-    "content_hash"   TEXT NOT NULL,
+    "embedding"      VECTOR(1536),
     "chunked_at"     TIMESTAMP WITH TIME ZONE NOT NULL,
     PRIMARY KEY ("paperId", "chunk_index")
-);
-
--- Chunk embeddings. Cannot reuse abstract_embeddings - its primary key is one row per
--- paper, but chunks need many rows per paper - so this has its own composite key.
--- What IS shared with abstract_embeddings is embedding_runs_metadata (via
--- target='chunk') and the dynamically-added embedding_{n_dim} column pattern.
--- ON DELETE CASCADE cleans up embeddings automatically if paper_chunks rows are
--- manually deleted to force re-chunking.
-CREATE TABLE IF NOT EXISTS processed.chunk_embeddings (
-    "paperId"       TEXT NOT NULL,
-    "chunk_index"   INTEGER NOT NULL,
-    "run_id"        BIGINT NOT NULL REFERENCES processed.embedding_runs_metadata("run_id"),
-    "processed_at"  TIMESTAMP WITH TIME ZONE,
-    "content_hash"  TEXT,
-    PRIMARY KEY ("paperId", "chunk_index", "run_id"),
-    FOREIGN KEY ("paperId", "chunk_index")
-        REFERENCES processed.paper_chunks ("paperId", "chunk_index") ON DELETE CASCADE
 );

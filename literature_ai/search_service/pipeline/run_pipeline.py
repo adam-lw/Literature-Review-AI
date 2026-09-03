@@ -12,8 +12,14 @@ from literature_ai.search_service.data_collect.get_ss_embeddings import (
 )
 from literature_ai.search_service.data_collect.get_ss_papers import collect_papers
 from literature_ai.db import check_connection, apply_schema
+from literature_ai.search_service.processing.build_keyword_vectors import (
+    build_keyword_vectors,
+)
 from literature_ai.search_service.processing.clean_paper import clean_paper
-from literature_ai.search_service.processing.create_index import create_hnsw_index
+from literature_ai.search_service.processing.create_index import (
+    create_hnsw_index,
+    create_keyword_search_index,
+)
 from literature_ai.search_service.processing.generate_paper_embeddings import (
     generate_paper_embeddings,
 )
@@ -87,6 +93,17 @@ def run_pipeline(config: dict[str, Any], artifact_path: Path) -> None:
             logger.exception(f"clean_paper stage failed: {e}")
         else:
             logger.info(f"clean_paper complete: {metrics}")
+
+    if stages.get("keyword_index", False):
+        kw_cfg = config.get("keyword_index", {})
+        try:
+            n_upserted = build_keyword_vectors()
+        except Exception as e:
+            logger.exception(f"keyword_index stage failed: {e}")
+        else:
+            logger.info(f"keyword_index complete: {n_upserted} rows upserted")
+            if kw_cfg.get("create_index", False):
+                create_keyword_search_index()
 
     if stages.get("embeddings", False):
         emb_cfg = config.get("embeddings", {})

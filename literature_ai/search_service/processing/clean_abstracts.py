@@ -141,7 +141,8 @@ def clean_abstracts(
         records.append(
             {
                 "paperId": paper_id,
-                "abstract_clean": cleaned or None,
+                "title": row.get("title"),
+                "abstract": cleaned or None,
                 "abstract_length": len(cleaned),
                 "word_count": len(cleaned.split()) if cleaned else 0,
                 "has_formula": has_formula,

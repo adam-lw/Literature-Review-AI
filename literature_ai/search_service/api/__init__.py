@@ -6,6 +6,9 @@ from literature_ai.search_service.api.routers.embedding_models import (
 from literature_ai.search_service.api.routers.full_paper import (
     router as full_paper_router,
 )
+from literature_ai.search_service.api.routers.keyword_search import (
+    router as keyword_search_router,
+)
 from literature_ai.search_service.api.routers.rag_paper_chunks import (
     router as rag_paper_chunks_router,
 )
@@ -18,5 +21,6 @@ app = FastAPI(
 
 app.include_router(embedding_models_router)
 app.include_router(full_paper_router)
+app.include_router(keyword_search_router)
 app.include_router(rag_paper_chunks_router)
 app.include_router(search_router)
