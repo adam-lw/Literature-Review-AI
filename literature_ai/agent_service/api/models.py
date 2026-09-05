@@ -69,3 +69,12 @@ class InvokeAgentResponse(BaseModel):
     response: Optional[str] = None
     question: Optional[AgentQuestion] = None
     messages: list[ChatMessage]
+    reasoning: Optional[str] = None
+
+
+class GenerateTitleRequest(BaseModel):
+    user_input: str
+
+
+class GenerateTitleResponse(BaseModel):
+    title: str
