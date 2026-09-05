@@ -58,7 +58,6 @@ class FullPaperResponse(BaseModel):
 class RagChunkRequest(BaseModel):
     paper_ids: list[str] = Field(..., min_length=1)
     query: str = Field(..., min_length=1)
-    embedding_model: str = Field(..., min_length=1)
     n_results: int = Field(5, ge=1, le=100)
 
 
@@ -72,7 +71,6 @@ class RagChunkResult(BaseModel):
 
 class RagChunkResponse(BaseModel):
     query: str
-    run_id: int
     n_results: int
     results: list[RagChunkResult]
 
