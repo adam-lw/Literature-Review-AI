@@ -42,11 +42,11 @@ export const AgentLocalStore = {
     return readAll().find((p) => p.project_id === id) ?? null
   },
 
-  createProject({ description, inclusion_criteria }) {
+  createProject({ description, inclusion_criteria, project_title }) {
     const now = new Date().toISOString()
     const project = {
       project_id: crypto.randomUUID(),
-      project_title: placeholderProjectTitle(),
+      project_title: project_title || placeholderProjectTitle(),
       mode: 'agent',
       description,
       inclusion_criteria: inclusion_criteria || null,

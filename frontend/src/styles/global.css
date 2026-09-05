@@ -685,6 +685,26 @@ a {
   margin-top: 0;
 }
 
+.agent-error-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.retry-btn {
+  background: var(--surface);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-5);
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.retry-btn:hover {
+  background: var(--surface-2);
+}
+
 .agent-continue-done {
   color: var(--muted);
   font-size: 0.9rem;
@@ -758,6 +778,18 @@ a {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  max-height: 400px;
+  overflow: hidden;
+  opacity: 1;
+  transform: scaleY(1);
+  transform-origin: top;
+  transition: max-height 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.agent-question-closing {
+  max-height: 0;
+  opacity: 0;
+  transform: scaleY(0.85);
 }
 
 .agent-question-description {
@@ -816,6 +848,143 @@ a {
   margin: 2px 0 0;
   font-size: 0.85rem;
   color: var(--text);
+}
+
+/* Agent thoughts */
+
+.agent-thoughts {
+  margin-bottom: var(--space-3);
+}
+
+.agent-thoughts-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.agent-thoughts-toggle:hover {
+  color: var(--text);
+}
+
+.agent-thoughts-body {
+  color: var(--muted);
+  font-style: italic;
+  font-size: 0.85rem;
+  margin: var(--space-2) 0 0;
+  white-space: pre-wrap;
+}
+
+/* Scope summary */
+
+.scope-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.scope-summary-header {
+  display: flex;
+}
+
+.scope-summary-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+
+.scope-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.scope-section-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.scope-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.88rem;
+}
+
+.scope-field-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.scope-list {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: 0.88rem;
+}
+
+.scope-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.scope-chip {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 2px var(--space-3);
+  font-size: 0.8rem;
+}
+
+.scope-callout {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  padding: var(--space-3);
+}
+
+.scope-callout p {
+  margin: var(--space-1) 0 0;
+  font-size: 0.88rem;
+}
+
+.scope-callout-title {
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.scope-callout-warning {
+  border-color: var(--danger);
+}
+
+.scope-callout-warning .scope-callout-title {
+  color: var(--danger);
+}
+
+.scope-raw-json {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  font-size: 0.78rem;
+  overflow-x: auto;
+  margin: var(--space-2) 0 0;
 }
 
 /* Chat composer */

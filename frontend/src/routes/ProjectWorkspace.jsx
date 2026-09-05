@@ -12,6 +12,8 @@ import FormatQuestionnaire from '../components/chat/FormatQuestionnaire.jsx'
 import PlaceholderNotice from '../components/chat/PlaceholderNotice.jsx'
 import AgentContinueBar from '../components/chat/AgentContinueBar.jsx'
 import AgentQuestion from '../components/chat/AgentQuestion.jsx'
+import AgentThoughts from '../components/chat/AgentThoughts.jsx'
+import ScopeSummary from '../components/chat/ScopeSummary.jsx'
 import { AGENT_PHASES, useAgentPhaseFlow } from '../components/chat/useAgentPhaseFlow.js'
 import { useAgentConversation } from '../components/chat/useAgentConversation.js'
 import { tryParseScope } from '../components/chat/scopeMemory.js'
@@ -265,21 +267,30 @@ export default function ProjectWorkspace() {
     }
   }
 
-  // Renders one phase agent's response as a transcript turn: its text on "completed"/"error",
-  // or just the question text on "awaiting_input" (the interactive answer UI itself lives in
-  // `renderAgentBottom`, not the transcript). Also captures the scoping phase's completed turn
-  // as the locally stored scope spec, if it parses as one (see `tryParseScope`).
+  // Renders one phase agent's completed/error response as a transcript turn: a "Thoughts"
+  // disclosure when the turn carried reasoning, then either a friendly scope summary card (when
+  // the scoping phase just finalized/updated its specification - see `tryParseScope`) or its
+  // plain text. An "awaiting_input" response leaves the transcript untouched - the interactive
+  // `AgentQuestion` card in `renderAgentBottom` is the sole representation of a pending question,
+  // and `handlePhaseMessage` commits it to history once it's actually answered.
   const appendPhaseResult = (result) => {
     if (!result.ok) {
       appendTurn('assistant', <p className="chat-error-text">{result.error}</p>)
       return
     }
     const { response } = result
-    if (agentFlow.phase?.key === 'scoping' && response.status === 'completed') {
-      const scope = tryParseScope(response.response)
-      if (scope) setScopeSpecification(scope)
-    }
-    appendTurn('assistant', <p>{response.status === 'awaiting_input' ? response.question.question : response.response}</p>)
+    if (response.status === 'awaiting_input') return
+
+    const scope = agentFlow.phase?.key === 'scoping' ? tryParseScope(response.response) : null
+    if (scope) setScopeSpecification(scope)
+
+    appendTurn(
+      'assistant',
+      <>
+        {response.reasoning && <AgentThoughts text={response.reasoning} />}
+        {scope ? <ScopeSummary specification={scope} /> : <p>{response.response}</p>}
+      </>,
+    )
   }
 
   const handleStartPhase = async () => {
@@ -292,7 +303,13 @@ export default function ProjectWorkspace() {
     appendPhaseResult(result)
   }
 
+  // Commits the just-answered question's title to history (the `AgentQuestion` card that showed
+  // it has already collapsed by the time this fires - see `AgentQuestion.jsx`), then the user's
+  // answer, before continuing the conversation.
   const handlePhaseMessage = async (text) => {
+    if (phaseAgent.question) {
+      appendTurn('assistant', <p>{phaseAgent.question.question}</p>)
+    }
     appendTurn('user', <p>{text}</p>)
     appendPhaseResult(await phaseAgent.send(text, buildPhaseMemory()))
   }
@@ -334,11 +351,25 @@ export default function ProjectWorkspace() {
     }
 
     const { response } = result
-    if (chatPhase.key === 'scoping' && response.status === 'completed') {
-      const scope = tryParseScope(response.response)
-      if (scope) setScopeSpecification(scope)
-    }
-    appendTurn('assistant', <p>{response.status === 'awaiting_input' ? response.question.question : response.response}</p>)
+    const scope =
+      chatPhase.key === 'scoping' && response.status === 'completed'
+        ? tryParseScope(response.response)
+        : null
+    if (scope) setScopeSpecification(scope)
+
+    appendTurn(
+      'assistant',
+      <>
+        {response.reasoning && <AgentThoughts text={response.reasoning} />}
+        {response.status === 'awaiting_input' ? (
+          <p>{response.question.question}</p>
+        ) : scope ? (
+          <ScopeSummary specification={scope} />
+        ) : (
+          <p>{response.response}</p>
+        )}
+      </>,
+    )
   }
 
   // In manual mode this talks to the standalone "chatbot" agent; in agent mode it's the current
@@ -352,7 +383,13 @@ export default function ProjectWorkspace() {
         ? await chatAgent.start('chatbot', text, includedPaperMemory)
         : await chatAgent.send(text, includedPaperMemory)
     if (result.ok) {
-      appendTurn('assistant', <p>{result.response.response}</p>)
+      appendTurn(
+        'assistant',
+        <>
+          {result.response.reasoning && <AgentThoughts text={result.response.reasoning} />}
+          <p>{result.response.response}</p>
+        </>,
+      )
     } else {
       appendTurn('assistant', <p className="chat-error-text">{result.error}</p>)
     }

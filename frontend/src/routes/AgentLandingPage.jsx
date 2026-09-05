@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '../context/ProjectsContext.jsx'
+import { generateTitle } from '../api/agentClient.js'
 
 export default function AgentLandingPage() {
   const navigate = useNavigate()
@@ -14,9 +15,17 @@ export default function AgentLandingPage() {
     e.preventDefault()
     if (!canSubmit) return
     setSubmitting(true)
+    const trimmedDescription = description.trim()
+    let project_title
+    try {
+      project_title = await generateTitle(trimmedDescription)
+    } catch {
+      // Title generation is best-effort - fall back to the local store's placeholder title.
+    }
     const project = await createAgentProject({
-      description: description.trim(),
+      description: trimmedDescription,
       inclusion_criteria: null,
+      project_title,
     })
     navigate(`/agent-projects/${project.project_id}`)
   }

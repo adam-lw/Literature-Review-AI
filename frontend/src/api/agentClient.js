@@ -41,3 +41,10 @@ export async function invokeAgent(stage, messages, memory, sessionId) {
     ...(sessionId ? { session_id: sessionId } : {}),
   })
 }
+
+// Talks to literature_ai/agent_service/api/routers/generate_title.py - generates a working
+// title for a new agent project from the user's initial description.
+export async function generateTitle(userInput) {
+  const { title } = await apiClient.post('/generate-title', { user_input: userInput })
+  return title
+}
