@@ -11,8 +11,9 @@ from literature_ai.agent_service.agent.memory import MemoryObject, get_formatted
 from literature_ai.agent_service.agent.tools import (
     Tool,
     get_all_tools,
-    get_tools_by_name,
+    get_tools_by_name
 )
+from literature_ai.agent_service.agent.tools.core import get_agent_context_facts
 from literature_ai.agent_service.agent.tools.skills import get_formatted_skills
 from literature_ai.utils import get_project_root
 
@@ -57,7 +58,7 @@ def _get_agent_settings(name: str) -> AgentSettings:
     The file may specify:
     - `tools`: a list of tool names. If the key is omitted, or the file
       doesn't exist, every registered tool is made available.
-    - `llm`: the model name to run the agent on. Defaults to "gpt-5-nano".
+    - `llm`: the model name to run the agent on. Defaults to "gpt-5.6-luna".
     - `allow_questions`: whether the agent may ask the user a clarifying
       question via the `ask_user` tool. Defaults to False.
     """
@@ -76,7 +77,7 @@ def _get_agent_settings(name: str) -> AgentSettings:
 
     return AgentSettings(
         tools=tools,
-        llm=settings.get("llm", "gpt-5-nano"),
+        llm=settings.get("llm", "gpt-5.6-luna"),
         allow_questions=settings.get("allow_questions", False),
     )
 
@@ -107,8 +108,9 @@ async def spawn_agent(
     agent_prompt = get_prompt(f"agent_types/{name}")
     skills = get_formatted_skills()
     memory_summary = get_formatted_memory(memory_objects)
+    additional_information = get_agent_context_facts()
 
-    system_prompt = "\n".join([react_prompt, agent_prompt, skills, memory_summary])
+    system_prompt = "\n".join([react_prompt, agent_prompt, skills, memory_summary, additional_information])
 
     # retrieve additional settings
     settings = _get_agent_settings(name)

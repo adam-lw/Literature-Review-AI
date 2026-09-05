@@ -5,8 +5,7 @@ ASK_USER_TOOL = Tool(
     definition={
         "description": (
             "Ask the user a question when you need information only they can "
-            "provide before you can continue. Ends your turn immediately - "
-            "their reply arrives as a new message the next time you run."
+            "provide before you can continue. ALWAYS use this tool when you need to ask a question."
         ),
         "params": [
             {

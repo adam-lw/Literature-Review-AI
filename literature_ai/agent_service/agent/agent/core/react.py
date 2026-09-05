@@ -56,6 +56,11 @@ class ReactAgent:
             else:
                 self.context.append(content)
 
+        # Text a model emits alongside a tool call within this `run_agent` call is reasoning,
+        # not a final answer (see `LLMResponse`'s docstring) - collected here so callers can
+        # show it separately from the turn's actual result.
+        reasoning_parts: list[str] = []
+
         try:
             for iteration in range(1, max_iter + 1):
                 # Reason
@@ -73,7 +78,11 @@ class ReactAgent:
                         result=Message(
                             role="assistant", content=result.content or ""
                         ),
+                        reasoning="\n\n".join(reasoning_parts) or None,
                     )
+
+                if result.content:
+                    reasoning_parts.append(result.content)
 
                 # Handle tool calls in result
                 logger.debug(
@@ -96,7 +105,10 @@ class ReactAgent:
                             ),
                         )
                         return AgentResponse(
-                            status="awaiting_input", state=self.context, result=question
+                            status="awaiting_input",
+                            state=self.context,
+                            result=question,
+                            reasoning="\n\n".join(reasoning_parts) or None,
                         )
 
                     if tool_call.name not in self.tools:
@@ -119,6 +131,7 @@ class ReactAgent:
                     role="assistant",
                     content=f"Agent did not converge within {max_iter} iterations.",
                 ),
+                reasoning="\n\n".join(reasoning_parts) or None,
             )
         except Exception as exc:
             logger.exception(f"Agent loop failed: {exc}")
@@ -126,6 +139,7 @@ class ReactAgent:
                 status="error",
                 state=self.context,
                 result=Message(role="assistant", content=str(exc)),
+                reasoning="\n\n".join(reasoning_parts) or None,
             )
 
     def _call_tool(self, tool_call: ToolCall) -> Any:

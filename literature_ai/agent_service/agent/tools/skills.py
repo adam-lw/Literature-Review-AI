@@ -70,7 +70,7 @@ def get_formatted_skills() -> str:
 
     skill_lines = "\n".join(f"- {s['name']}: {s['description']}" for s in skills)
     return (
-        "The following skills are available. Call `load_skill` with the exact "
+        "\n## Skills:\n\nThe following skills are available. Call `load_skill` with the exact "
         "name of a skill to load its full instructions before using it.\n"
         f"{skill_lines}"
     )

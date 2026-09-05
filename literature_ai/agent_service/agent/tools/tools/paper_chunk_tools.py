@@ -15,13 +15,13 @@ SEARCH_SERVICE_URL = os.getenv("SEARCH_SERVICE_URL", "http://localhost:8000")
         "Performs a RAG search over the full text of specific papers (not just their "
         "abstracts), restricted to the paper_ids you provide. Use this when a query "
         "needs details that live in a paper's body - methodology details, specific "
-        "numbers, quotes - rather than what's summarized in the abstract. On first use "
-        "for a given paper it is chunked and embedded on demand, which can take "
-        "noticeably longer than an abstract-only search, especially for several papers "
-        "not seen before; results are cached after that."
+        "numbers, quotes - rather than what's summarized in the abstract. Only "
+        "searches papers that have already been fetched and chunked (e.g. via a prior "
+        "list_paper_sections or get_paper_section call for that paper_id) - a paper "
+        "not yet processed simply contributes no results, so fetch it first."
     ),
 )
-def rag_paper_chunks(paper_ids: list[str], query: str, embedding_model: str, n_results: int = 5) -> str:
+def rag_paper_chunks(paper_ids: list[str], query: str, n_results: int = 5) -> str:
     """Search the full text of specific papers by calling the search service's API.
 
     Parameters
@@ -30,25 +30,19 @@ def rag_paper_chunks(paper_ids: list[str], query: str, embedding_model: str, n_r
         Paper ids to restrict the search to (e.g. from vector_search results).
     query : str
         Natural-language search query to run against each paper's full text.
-    embedding_model : str
-        Embedding model name to use for chunk embeddings. Must support embedding
-        arbitrary text - some paper-level-only models (e.g. specter_v1, specter_v2)
-        do not and will fail.
     n_results : int
         Number of chunk results to return across all papers. Default is 5.
 
     Raises
     ------
     requests.HTTPError
-        If the search service request fails (e.g. unknown paper_id, or a model that
-        doesn't support this kind of search).
+        If the search service request fails.
     """
     response = requests.post(
         f"{SEARCH_SERVICE_URL}/rag-paper-chunks",
         json={
             "paper_ids": paper_ids,
             "query": query,
-            "embedding_model": embedding_model,
             "n_results": n_results,
         },
         timeout=200,

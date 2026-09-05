@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Literal, Union
+from typing import Literal, Optional, Union
 
 from literature_ai.agent_service.agent.llm.core import Message, Messages
 
@@ -32,6 +32,7 @@ class AgentResponse:
     status: AgentStatus
     state: Messages
     result: Union[Message, Question]
+    reasoning: Optional[str] = None
 
     def as_text(self) -> str:
         """

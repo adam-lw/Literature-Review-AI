@@ -3,6 +3,7 @@ import pkgutil
 import os
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
+from datetime import datetime
 
 from literature_ai.agent_service.agent.memory import MemoryObject
 
@@ -103,3 +104,7 @@ class ToolForbiddenException(Exception):
 
 class ToolNotFoundException(Exception):
     pass
+
+def get_agent_context_facts():
+    return f"""\n## Additional Information
+    \n Today's date is {datetime.now().strftime("%d/%m/%Y")}."""
