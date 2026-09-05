@@ -23,30 +23,33 @@ The project implements a full microservice architecture via Docker, including a 
 ### Functionality Progress
 The project is currently WIP - below is a summary of the completed functionality, as included in the `dev` branch.
 
-🟢 Data Collection & Processing - Complete
+- 🟢 **Data Collection & Processing** - Complete
   - Implemented pipeline for collecting bulk dataset for searching over, collected from Semantic Scholar's bulk API.
 
-🟢 Semantic Search - Complete
+- 🟢 **Paper Semantic Search & Keyword Search** - Complete
   - Includes 5 optional embedding approaches and a full embedding comparison pipeline. Users can choose between the available embedding models in the UI.
 
-🟢 Application Layer & UI - Complete
+- 🟢 **Application Layer & UI** - Complete
   - UI powered by React / Vite.js - offers an optional manual mode, and a stepwise agentic mode to allow users control over the search process and inclusion/exclusion criteria application.
   - Application layer persists user "projects", interfaces with a stateless agent service and the paper/RAG service.
 
-🟢 LLM Backend & Logging
+- 🟢 **LLM Backend & Logging**
   - Integrates with Langfuse to provide trace logging.
 
-🟢 Project Scoping Agent - Complete
+- 🟢 **Project Scoping Agent** - Complete
   - Agent to work with the user to iteratively define the bounds & criteria for the 
 
-🟢 Chatbot Agent - v1 Complete
+- 🟢 **Chatbot Agent** - v1 Complete
   - Allows users to ask FAQs, query the paper findings, produce summarisations and other similar functionality.
 
-🟡 Inclusion / Exclusion Criteria Assessment Agent - WIP
+- 🟢 **RAG Chunk & Paper Content Search**
+  - Chunking of retrieved papers & semantic search over them for paper review & citation.
 
-🟡 Paper Writing Agent - WIP
+- 🟡 **Inclusion / Exclusion Criteria Assessment Agent** - Experimental
 
-🔴 Keyword & Hybrid Searches - Not yet implemented
+- 🟡 **Paper Writing Agent** - WIP
+
+- 🔴 **Hybrid Search** - Not yet implemented
 
 
 
