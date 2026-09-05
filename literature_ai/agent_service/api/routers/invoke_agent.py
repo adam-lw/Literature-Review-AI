@@ -95,12 +95,14 @@ def _to_response(agent_response: AgentResponse) -> InvokeAgentResponse:
                 allows_freetext=agent_response.result.allows_freetext,
             ),
             messages=messages,
+            reasoning=agent_response.reasoning,
         )
 
     return InvokeAgentResponse(
         status=agent_response.status,
         response=agent_response.result.content,
         messages=messages,
+        reasoning=agent_response.reasoning,
     )
 
 
