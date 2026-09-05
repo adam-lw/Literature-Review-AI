@@ -4,33 +4,36 @@ from fastapi.testclient import TestClient
 
 import literature_ai.search_service.api.routers.full_paper as full_paper_router
 import main
-from literature_ai.search_service.full_paper.service import FullPaperContent, PaperNotFoundError
+from literature_ai.search_service.data_collect.collect_full_papers import PaperNotFoundError
 
-_TEI_XML = """<?xml version="1.0"?>
-<TEI xmlns="http://www.tei-c.org/ns/1.0">
-    <teiHeader>
-        <fileDesc><titleStmt><title level="a" type="main">T</title></titleStmt></fileDesc>
-    </teiHeader>
-    <text><body>
-        <div><head>Introduction</head><p>intro text</p></div>
-        <div><head>Methodology</head><p>method text</p></div>
-    </body></text>
-</TEI>"""
+_HEADERS = [
+    {"section_index": 0, "section_header": "Introduction"},
+    {"section_index": 1, "section_header": "Methodology"},
+]
+
+_SECTION_TEXT = {
+    "Introduction": "intro text",
+    "Methodology": "method text",
+}
 
 
-def _content(**overrides) -> FullPaperContent:
+def _record(**overrides) -> dict:
     base = dict(
         paperId="p1", status="success", pdf_url="https://example.org/p.pdf",
-        full_text="body", tei_xml=_TEI_XML, grobid_version="0.8.2",
+        full_text="body", tei_xml="<TEI/>", grobid_version="0.8.2",
         parsed_at=datetime.now(timezone.utc),
     )
     base.update(overrides)
-    return FullPaperContent(**base)
+    return base
 
 
 def test_get_paper_section_returns_section_by_index(monkeypatch):
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
-    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _content())
+    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _record())
+    monkeypatch.setattr(full_paper_router, "get_section_headers", lambda paper_id: _HEADERS)
+    monkeypatch.setattr(
+        full_paper_router, "get_section_content", lambda paper_id, section: _SECTION_TEXT[section]
+    )
 
     with TestClient(main.app) as client:
         response = client.get("/api/full-paper/p1/sections/1")
@@ -44,7 +47,8 @@ def test_get_paper_section_returns_section_by_index(monkeypatch):
 
 def test_get_paper_section_unknown_index_returns_404(monkeypatch):
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
-    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _content())
+    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _record())
+    monkeypatch.setattr(full_paper_router, "get_section_headers", lambda paper_id: _HEADERS)
 
     with TestClient(main.app) as client:
         response = client.get("/api/full-paper/p1/sections/5")
@@ -57,7 +61,7 @@ def test_get_paper_section_no_full_text_returns_404(monkeypatch):
     monkeypatch.setattr(
         full_paper_router,
         "get_or_create_full_paper",
-        lambda paper_id: _content(status="no_pdf_available", tei_xml=None, full_text=None),
+        lambda paper_id: _record(status="no_pdf_available", tei_xml=None, full_text=None),
     )
 
     with TestClient(main.app) as client:
@@ -82,7 +86,8 @@ def test_get_paper_section_unknown_paper_returns_404(monkeypatch):
 
 def test_list_paper_sections_returns_headers_in_order(monkeypatch):
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
-    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _content())
+    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _record())
+    monkeypatch.setattr(full_paper_router, "get_section_headers", lambda paper_id: _HEADERS)
 
     with TestClient(main.app) as client:
         response = client.get("/api/full-paper/p1/sections")
@@ -97,7 +102,7 @@ def test_list_paper_sections_returns_headers_in_order(monkeypatch):
 def test_get_full_paper_route_still_works_alongside_new_subroutes(monkeypatch):
     # Regression guard: /{paper_id} must not be shadowed by /{paper_id}/section(s).
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
-    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _content())
+    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _record())
 
     with TestClient(main.app) as client:
         response = client.get("/api/full-paper/p1")

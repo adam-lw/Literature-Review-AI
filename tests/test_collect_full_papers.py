@@ -1,3 +1,4 @@
+import pytest
 import requests
 
 import literature_ai.search_service.data_collect.collect_full_papers as collect_module
@@ -99,10 +100,14 @@ def test_process_papers_by_id_success_persists_fulltext_and_chunk_offsets(monkey
         _FakeEngine(
             [
                 None,  # no cached row in raw.paper_fulltext
-                ("https://example.org/p.pdf", None),  # raw_paper_searches candidate row
                 None,  # not already chunked
             ]
         ),
+    )
+    monkeypatch.setattr(
+        collect_module,
+        "get_paper_metadata",
+        lambda paper_id: {"url": "https://example.org/p.pdf", "ArXiV": None},
     )
     monkeypatch.setattr(collect_module._pdf_session, "get", lambda *a, **k: _FakeResponse())
     monkeypatch.setattr(collect_module, "call_grobid_fulltext", lambda pdf_bytes: _TEI_XML)
@@ -147,7 +152,8 @@ def test_process_papers_by_id_skips_already_cached_and_chunked(monkeypatch):
 
 
 def test_process_papers_by_id_unknown_paper_counts_as_error(monkeypatch):
-    monkeypatch.setattr(collect_module, "ENGINE", _FakeEngine([None, None]))
+    monkeypatch.setattr(collect_module, "ENGINE", _FakeEngine([None]))
+    monkeypatch.setattr(collect_module, "get_paper_metadata", lambda paper_id: None)
     calls = _capture_upserts(monkeypatch)
 
     metrics = process_papers_by_id(["missing"])
@@ -158,10 +164,9 @@ def test_process_papers_by_id_unknown_paper_counts_as_error(monkeypatch):
 
 
 def test_process_papers_by_id_no_candidate_url_persists_no_pdf_available(monkeypatch):
+    monkeypatch.setattr(collect_module, "ENGINE", _FakeEngine([None]))  # not cached
     monkeypatch.setattr(
-        collect_module,
-        "ENGINE",
-        _FakeEngine([None, (None, None)]),  # not cached, no url/ArXiV
+        collect_module, "get_paper_metadata", lambda paper_id: {"url": None, "ArXiV": None}
     )
     calls = _capture_upserts(monkeypatch)
 
@@ -174,10 +179,11 @@ def test_process_papers_by_id_no_candidate_url_persists_no_pdf_available(monkeyp
 
 
 def test_process_papers_by_id_download_failure_persists_no_pdf_available(monkeypatch):
+    monkeypatch.setattr(collect_module, "ENGINE", _FakeEngine([None]))  # not cached
     monkeypatch.setattr(
         collect_module,
-        "ENGINE",
-        _FakeEngine([None, ("https://example.org/p.pdf", None)]),
+        "get_paper_metadata",
+        lambda paper_id: {"url": "https://example.org/p.pdf", "ArXiV": None},
     )
 
     def _raise(*a, **k):
@@ -193,10 +199,11 @@ def test_process_papers_by_id_download_failure_persists_no_pdf_available(monkeyp
 
 
 def test_process_papers_by_id_grobid_failure_counts_as_error_and_does_not_persist(monkeypatch):
+    monkeypatch.setattr(collect_module, "ENGINE", _FakeEngine([None]))  # not cached
     monkeypatch.setattr(
         collect_module,
-        "ENGINE",
-        _FakeEngine([None, ("https://example.org/p.pdf", None)]),
+        "get_paper_metadata",
+        lambda paper_id: {"url": "https://example.org/p.pdf", "ArXiV": None},
     )
     monkeypatch.setattr(collect_module._pdf_session, "get", lambda *a, **k: _FakeResponse())
 
@@ -219,12 +226,12 @@ def test_process_papers_by_id_continues_after_one_id_errors(monkeypatch):
         _FakeEngine(
             [
                 None,  # p_bad: not cached
-                None,  # p_bad: unknown paper
                 ("success", "full text", "<TEI/>"),  # p_good: cached
                 (1,),  # p_good: already chunked
             ]
         ),
     )
+    monkeypatch.setattr(collect_module, "get_paper_metadata", lambda paper_id: None)
     calls = _capture_upserts(monkeypatch)
 
     metrics = process_papers_by_id(["p_bad", "p_good"])
@@ -233,3 +240,55 @@ def test_process_papers_by_id_continues_after_one_id_errors(monkeypatch):
     assert metrics.errors == 1
     assert metrics.inserted == 1
     assert calls == []
+
+
+def test_get_or_create_full_paper_returns_cached_record_without_processing(monkeypatch):
+    record = {"paperId": "p1", "status": "success", "full_text": "x"}
+    monkeypatch.setattr(collect_module, "get_full_paper_record", lambda paper_id: record)
+
+    def _fail(*a, **k):
+        raise AssertionError("_process_one should not be called on a cache hit")
+
+    monkeypatch.setattr(collect_module, "_process_one", _fail)
+
+    assert collect_module.get_or_create_full_paper("p1") is record
+
+
+def test_get_or_create_full_paper_processes_then_returns_stored_record(monkeypatch):
+    records = iter([None, {"paperId": "p1", "status": "success", "full_text": "x"}])
+    monkeypatch.setattr(collect_module, "get_full_paper_record", lambda paper_id: next(records))
+    calls = []
+    monkeypatch.setattr(
+        collect_module,
+        "_process_one",
+        lambda paper_id, max_chars: calls.append(paper_id) or ("success", "x", "<TEI/>"),
+    )
+
+    result = collect_module.get_or_create_full_paper("p1")
+
+    assert calls == ["p1"]
+    assert result["status"] == "success"
+
+
+def test_get_or_create_full_paper_propagates_paper_not_found(monkeypatch):
+    monkeypatch.setattr(collect_module, "get_full_paper_record", lambda paper_id: None)
+
+    def _raise(paper_id, max_chars):
+        raise collect_module.PaperNotFoundError(f"No paper found for paperId={paper_id!r}")
+
+    monkeypatch.setattr(collect_module, "_process_one", _raise)
+
+    with pytest.raises(collect_module.PaperNotFoundError):
+        collect_module.get_or_create_full_paper("missing")
+
+
+def test_get_or_create_full_paper_propagates_grobid_errors(monkeypatch):
+    monkeypatch.setattr(collect_module, "get_full_paper_record", lambda paper_id: None)
+
+    def _raise(paper_id, max_chars):
+        raise GrobidUnavailableError("grobid down")
+
+    monkeypatch.setattr(collect_module, "_process_one", _raise)
+
+    with pytest.raises(GrobidUnavailableError):
+        collect_module.get_or_create_full_paper("p1")

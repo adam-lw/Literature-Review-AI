@@ -4,16 +4,14 @@ from fastapi.testclient import TestClient
 
 import literature_ai.search_service.api.routers.full_paper as full_paper_router
 import main
-from literature_ai.search_service.full_paper.service import (
-    FullPaperContent,
+from literature_ai.search_service.data_collect.collect_full_papers import PaperNotFoundError
+from literature_ai.search_service.processing.pdf_parsing import (
     GrobidParseError,
     GrobidUnavailableError,
-    PaperNotFoundError,
-    PdfDownloadError,
 )
 
 
-def _content(**overrides) -> FullPaperContent:
+def _record(**overrides) -> dict:
     base = dict(
         paperId="p1",
         status="success",
@@ -24,14 +22,12 @@ def _content(**overrides) -> FullPaperContent:
         parsed_at=datetime.now(timezone.utc),
     )
     base.update(overrides)
-    return FullPaperContent(**base)
+    return base
 
 
 def test_get_full_paper_success_excludes_tei_xml_by_default(monkeypatch):
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
-    monkeypatch.setattr(
-        full_paper_router, "get_or_create_full_paper", lambda paper_id: _content()
-    )
+    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _record())
 
     with TestClient(main.app) as client:
         response = client.get("/api/full-paper/p1")
@@ -45,9 +41,7 @@ def test_get_full_paper_success_excludes_tei_xml_by_default(monkeypatch):
 
 def test_get_full_paper_includes_tei_xml_when_requested(monkeypatch):
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
-    monkeypatch.setattr(
-        full_paper_router, "get_or_create_full_paper", lambda paper_id: _content()
-    )
+    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", lambda paper_id: _record())
 
     with TestClient(main.app) as client:
         response = client.get("/api/full-paper/p1?include_tei_xml=true")
@@ -61,7 +55,7 @@ def test_get_full_paper_no_pdf_available_returns_200(monkeypatch):
     monkeypatch.setattr(
         full_paper_router,
         "get_or_create_full_paper",
-        lambda paper_id: _content(
+        lambda paper_id: _record(
             status="no_pdf_available", pdf_url=None, full_text=None, tei_xml=None
         ),
     )
@@ -85,20 +79,6 @@ def test_get_full_paper_unknown_paper_returns_404(monkeypatch):
         response = client.get("/api/full-paper/missing")
 
     assert response.status_code == 404
-
-
-def test_get_full_paper_download_failure_returns_502(monkeypatch):
-    monkeypatch.setattr(main, "apply_schema", lambda path: None)
-
-    def _raise(paper_id):
-        raise PdfDownloadError("boom")
-
-    monkeypatch.setattr(full_paper_router, "get_or_create_full_paper", _raise)
-
-    with TestClient(main.app) as client:
-        response = client.get("/api/full-paper/p3")
-
-    assert response.status_code == 502
 
 
 def test_get_full_paper_grobid_parse_error_returns_502(monkeypatch):
