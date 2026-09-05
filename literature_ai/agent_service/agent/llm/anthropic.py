@@ -5,7 +5,7 @@ from anthropic import AsyncAnthropic, omit
 from anthropic.types import MessageParam, TextBlock, ToolParam, ToolUseBlock
 import os
 
-ANTHROPIC_MODELS = ["claude-3-5-haiku-20241022", "claude-sonnet-4-5-20250929"]
+ANTHROPIC_MODELS = ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"]
 
 
 class AnthropicLLM(LLM):

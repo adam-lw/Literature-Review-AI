@@ -10,7 +10,7 @@ from openai.types.responses import FunctionToolParam
 
 load_dotenv()
 
-OPENAI_MODELS = ["gpt-5-nano", "gpt-4o-mini"]
+OPENAI_MODELS = ["gpt-5.6-luna", "gpt-5.6-terra"]
 
 
 class OpenAiLLM(LLM):
