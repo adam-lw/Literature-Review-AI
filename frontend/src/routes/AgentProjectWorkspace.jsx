@@ -125,11 +125,14 @@ export default function AgentProjectWorkspace() {
     if (result.ok) appendPhaseResult(result)
   }
 
+  // Only the scoping phase should restate the original research description as its opening
+  // instruction - later phases (search_review, writing) source their input purely from the
+  // scope memory `buildPhaseMemory()` attaches below, so they start with no user instruction at
+  // all (`ReactAgent.run_agent` skips adding a user turn for falsy content).
   const handleStartPhase = () => {
     setPhaseStarted(true)
-    return runPhaseAction(() =>
-      phaseAgent.start(agentFlow.phase.stage, project.description, buildPhaseMemory()),
-    )
+    const content = agentFlow.phase.key === 'scoping' ? project.description : ''
+    return runPhaseAction(() => phaseAgent.start(agentFlow.phase.stage, content, buildPhaseMemory()))
   }
 
   const retryLastPhaseAction = () => {
