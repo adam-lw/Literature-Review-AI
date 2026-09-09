@@ -14,7 +14,7 @@ class BgeM3Embedding(EmbeddingModel):
     ``list[float]`` contract shared across ``EmbeddingModel`` subclasses.
     """
 
-    def __init__(self, **config: dict[str, Any]):
+    def __init__(self, **config: Any):
         model_name = str(config.get("model_name", "BAAI/bge-m3"))
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModel.from_pretrained(model_name)

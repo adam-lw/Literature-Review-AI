@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 from loguru import logger
 
@@ -114,7 +114,9 @@ def run_pipeline(config: dict[str, Any], artifact_path: Path) -> None:
 
         for model in collect_models:
             try:
-                run_id = collect_embeddings(embedding=model)
+                run_id = collect_embeddings(
+                    embedding=cast(Literal["specter_v1", "specter_v2"], model)
+                )
             except Exception as e:
                 logger.exception(
                     f"embeddings collect stage failed for model '{model}': {e}"

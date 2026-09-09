@@ -14,7 +14,7 @@ OPENAI_MODELS = ["gpt-5.6-luna", "gpt-5.6-terra"]
 
 
 class OpenAiLLM(LLM):
-    def __init__(self, model: str, **config: dict[str, Any]):
+    def __init__(self, model: str, **config: Any):
         self._validate_model(model)
         self.model = model
         self.config = config

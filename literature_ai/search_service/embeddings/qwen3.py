@@ -34,7 +34,7 @@ class Qwen3Embedding(EmbeddingModel):
     an M4 Air. Override ``model_name`` in config for the 0.6B/8B sizes.
     """
 
-    def __init__(self, **config: dict[str, Any]):
+    def __init__(self, **config: Any):
         load_dotenv()
         base_url = str(
             config.get("base_url")

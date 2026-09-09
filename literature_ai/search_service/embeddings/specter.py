@@ -7,7 +7,7 @@ from literature_ai.search_service.embeddings.core import EmbeddingModel
 
 
 class SpecterV2Embedding(EmbeddingModel):
-    def __init__(self, **config: dict[str, Any]):
+    def __init__(self, **config: Any):
         self.tokenizer = AutoTokenizer.from_pretrained("allenai/specter2_base")
         self.model = AutoAdapterModel.from_pretrained("allenai/specter2_base")
         self.model.load_adapter(
@@ -50,7 +50,7 @@ class SpecterV2Embedding(EmbeddingModel):
 
 
 class SpecterV1Embedding(EmbeddingModel):
-    def __init__(self, **config: dict[str, Any]):
+    def __init__(self, **config: Any):
         self.tokenizer = AutoTokenizer.from_pretrained("allenai/specter")
         self.model = AutoModel.from_pretrained("allenai/specter")
         self.config = config

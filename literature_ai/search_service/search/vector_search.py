@@ -101,13 +101,10 @@ def vector_search(
         ``run_id`` is not provided.
     run_id : int or None
         Embedding run ID. When provided, model metadata is looked up
-        directly and ``model_name`` / ``model_version`` / ``n_dim`` are
-        ignored.
+        directly and ``model_name`` / ``model_version`` are ignored.
     model_version : str or None
         Model version string. ``None`` matches runs where ``embedding_version``
         is ``NULL``. Only used when ``run_id`` is ``None``.
-    n_dim : int or None
-        Embedding dimensionality. Only used when ``run_id`` is ``None``.
     n_results : int
         Number of nearest neighbours to return. Default is ``5``.
 

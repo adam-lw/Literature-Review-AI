@@ -20,7 +20,7 @@ class NomicEmbedText(EmbeddingModel):
     added automatically by Ollama. It emits 768-dim vectors.
     """
 
-    def __init__(self, **config: dict[str, Any]):
+    def __init__(self, **config: Any):
         load_dotenv()
         base_url = str(
             config.get("base_url")

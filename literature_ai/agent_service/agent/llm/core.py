@@ -104,7 +104,9 @@ class Messages:
                     "Cannot assign a Messages with more than one message to a single index"
                 )
             message = message[0]
-        if isinstance(message, dict):
+        if isinstance(message, str):
+            message = Message(role="system", content=message)
+        elif isinstance(message, dict):
             message = Message(**message)
         self._messages[index] = message
 

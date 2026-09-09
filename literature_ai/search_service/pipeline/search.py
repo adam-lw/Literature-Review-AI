@@ -5,7 +5,6 @@ from literature_ai.search_service.search.vector_search import vector_search
 QUERY = "machine learning optical coherence tomography oct"
 MODEL_NAME = "specter_v2"
 MODEL_VERSION = None
-N_DIM = None
 N_RESULTS = 10
 
 if __name__ == "__main__":
@@ -14,7 +13,6 @@ if __name__ == "__main__":
         query=QUERY,
         model_name=MODEL_NAME,
         model_version=MODEL_VERSION,
-        n_dim=N_DIM,
         n_results=N_RESULTS,
     )
     logger.info(f"Found {len(results)} results")

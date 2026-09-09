@@ -82,3 +82,14 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["literature_ai*"]
+
+[tool.ruff]
+# Exploratory analysis notebooks routinely violate module-level lint rules
+# (e.g. imports after a warnings.filterwarnings() call) - not worth enforcing.
+extend-exclude = ["notebooks"]
+
+[[tool.mypy.overrides]]
+# No type stubs published for these, and torch isn't installed by default
+# (it's an opt-in extra - see [project.optional-dependencies] above).
+module = ["langdetect", "adapters", "torch", "torch.*"]
+ignore_missing_imports = true

@@ -6,7 +6,7 @@ import yaml
 from literature_ai.agent_service.agent.agent.core.react import ReactAgent
 from literature_ai.agent_service.agent.agent.core.response import AgentResponse
 from literature_ai.agent_service.agent.prompt.prompt import get_prompt, PROMPTS_PATH
-from literature_ai.agent_service.agent.llm.core import get_llm, Messages
+from literature_ai.agent_service.agent.llm.core import get_llm, Messages, MessageLike
 from literature_ai.agent_service.agent.memory import MemoryObject, get_formatted_memory
 from literature_ai.agent_service.agent.tools import (
     Tool,
@@ -84,7 +84,7 @@ def _get_agent_settings(name: str) -> AgentSettings:
 
 async def spawn_agent(
     name: str,
-    instruction: str,
+    instruction: MessageLike,
     memory_objects: Optional[dict[str, MemoryObject]] = None,
 ) -> AgentResponse:
     """
