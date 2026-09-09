@@ -54,7 +54,10 @@ export const AgentLocalStore = {
       updated_at: now,
       stage: 'reviewing',
       formatPreferences: null,
-      conversation: [],
+      // The workspace's full resumable state (transcript, phase progress, and each agent
+      // conversation's resend history) - see `AgentProjectWorkspace.jsx`. Null until the
+      // workspace has been opened and persists at least once.
+      agentState: null,
     }
     const projects = readAll()
     projects.unshift(project)

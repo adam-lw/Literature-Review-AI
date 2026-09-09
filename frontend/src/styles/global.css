@@ -54,7 +54,7 @@ a {
 .app-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
 }
 
 .app-header {
@@ -72,7 +72,7 @@ a {
 .app-name {
   font-family: var(--font-serif);
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 500;
   margin-right: auto;
   display: flex;
   align-items: center;
@@ -321,6 +321,7 @@ a {
 .landing-hero h1 {
   font-family: var(--font-serif);
   font-size: 2rem;
+  font-weight: 400;
   margin: 0 0 var(--space-2);
 }
 
@@ -447,6 +448,7 @@ a {
 
 .project-title-heading {
   font-family: var(--font-serif);
+  font-weight: 400;
   margin: 0;
   cursor: text;
   margin-right: auto;
@@ -454,6 +456,7 @@ a {
 
 .title-input {
   font-family: var(--font-serif);
+  font-weight: 400;
   font-size: 1.5rem;
   margin-right: auto;
   flex: 1;

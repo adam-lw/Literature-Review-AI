@@ -63,10 +63,45 @@ export function useAgentConversation() {
   // Starts a brand new conversation on the next `start` call, discarding the resend history.
   const reset = useCallback(() => {
     historyRef.current = null
+    stageRef.current = null
     setStatus(null)
     setQuestion(null)
     sessionIdRef.current = crypto.randomUUID()
   }, [])
 
-  return { start, send, reset, sending, status, question }
+  // A plain-data snapshot of everything needed to resume this conversation later without
+  // re-calling the backend - the caller persists this (e.g. to localStorage) alongside the
+  // rendered transcript. `status`/`question` are read from state (current at render time), not
+  // refs, since the caller takes the snapshot from a `useEffect` that already re-ran after those
+  // updated.
+  const getSnapshot = useCallback(
+    () => ({
+      history: historyRef.current,
+      stage: stageRef.current,
+      sessionId: sessionIdRef.current,
+      status,
+      question,
+    }),
+    [status, question],
+  )
+
+  // Restores a conversation from a snapshot taken by `getSnapshot` - sets local state only, never
+  // issues a request, so resuming a project never resends anything to the LLM on its own.
+  const hydrate = useCallback((snapshot) => {
+    if (!snapshot) {
+      historyRef.current = null
+      stageRef.current = null
+      sessionIdRef.current = crypto.randomUUID()
+      setStatus(null)
+      setQuestion(null)
+      return
+    }
+    historyRef.current = snapshot.history ?? null
+    stageRef.current = snapshot.stage ?? null
+    sessionIdRef.current = snapshot.sessionId ?? crypto.randomUUID()
+    setStatus(snapshot.status ?? null)
+    setQuestion(snapshot.question ?? null)
+  }, [])
+
+  return { start, send, reset, getSnapshot, hydrate, sending, status, question }
 }

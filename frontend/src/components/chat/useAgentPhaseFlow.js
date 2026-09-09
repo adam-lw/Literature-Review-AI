@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 // The 3 stages an agent-mode project moves through, one at a time, each its own agent
 // conversation (backend `stage` name) - project scoping, then literature search + inclusion/
@@ -34,18 +34,20 @@ export const AGENT_PHASES = [
 // Tracks which of the 3 phases an agent-mode project is on. Bookkeeping only - the phase's
 // actual agent conversation lives in a `useAgentConversation` instance the caller drives
 // alongside this, restarting it (via `.reset()`) whenever `advance` moves to the next phase.
-export function useAgentPhaseFlow(active) {
+//
+// The caller owns which project this is for - it must call `goTo` explicitly whenever it
+// switches projects (0 for a project never started, or the project's persisted phase index to
+// resume one already in progress). This hook does not reset itself on its own, so switching
+// projects can never silently rewind an in-progress one back to phase 0 and re-trigger its
+// opening call.
+export function useAgentPhaseFlow() {
   const [phaseIndex, setPhaseIndex] = useState(0)
-
-  // Every time this project (re-)enters Agent mode, start from the first phase.
-  useEffect(() => {
-    if (active) setPhaseIndex(0)
-  }, [active])
 
   return {
     phase: AGENT_PHASES[phaseIndex] ?? null,
     phaseIndex,
     done: phaseIndex >= AGENT_PHASES.length,
     advance: () => setPhaseIndex((i) => i + 1),
+    goTo: (index) => setPhaseIndex(index),
   }
 }
