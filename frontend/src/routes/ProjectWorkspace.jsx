@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'reac
 import { useParams } from 'react-router-dom'
 import { useProjects } from '../context/ProjectsContext.jsx'
 import { useWorkspaceMode } from '../context/WorkspaceModeContext.jsx'
+import { WorkspaceChatStore } from '../store/WorkspaceChatStore.js'
 import { paperListMemory, scopingMemory } from '../api/agentClient.js'
 import CriteriaEditor from '../components/CriteriaEditor.jsx'
 import ResultsPanel from '../components/ResultsPanel.jsx'
@@ -36,7 +37,7 @@ export default function ProjectWorkspace() {
   // resent as memory to every later phase/chat, and can itself be updated by scoping_chat.
   const [scopeSpecification, setScopeSpecification] = useState(null)
 
-  const agentFlow = useAgentPhaseFlow(workspaceMode === 'agent')
+  const agentFlow = useAgentPhaseFlow()
   // One phase = one agent conversation: `phaseAgent` is reset (fresh create_agent call) every
   // time `agentFlow` advances to a new phase, and drives that phase's own Q&A. `phaseChatAgent`
   // is the separate "Chat with AI" conversation for the current phase, talking to its
@@ -72,17 +73,71 @@ export default function ProjectWorkspace() {
     }
   }, [store, id])
 
+  // Restores this project's persisted chat state (see the persist effect below) rather than
+  // wiping the transcript back to empty - a project that was already mid-conversation stays
+  // mid-conversation when reselected. Restoring never issues a request: `hydrate` only sets local
+  // state, and it restores `phaseStarted` as it was, so the auto-start effect further down (which
+  // only fires when `!phaseStarted`) sees nothing new to kick off and leaves an already-started
+  // phase alone. Only a project with no persisted state (never opened before) starts blank, which
+  // is what lets that effect fire its one legitimate opening call.
   useEffect(() => {
     load()
-    setConversation([])
-    setChatOpen(false)
-    setPhaseStarted(false)
-    setScopeSpecification(null)
-    phaseAgent.reset()
-    phaseChatAgent.reset()
-    chatAgent.reset()
+    const saved = WorkspaceChatStore.get(id)
+    if (saved) {
+      setConversation(saved.conversation ?? [])
+      setChatOpen(saved.chatOpen ?? false)
+      setPhaseStarted(saved.phaseStarted ?? false)
+      setScopeSpecification(saved.scopeSpecification ?? null)
+      agentFlow.goTo(saved.phaseIndex ?? 0)
+      phaseAgent.hydrate(saved.phaseAgent)
+      phaseChatAgent.hydrate(saved.phaseChatAgent)
+      chatAgent.hydrate(saved.chatAgent)
+    } else {
+      setConversation([])
+      setChatOpen(false)
+      setPhaseStarted(false)
+      setScopeSpecification(null)
+      agentFlow.goTo(0)
+      phaseAgent.reset()
+      phaseChatAgent.reset()
+      chatAgent.reset()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load])
+  }, [load, id])
+
+  // Mirrors this project's chat state back to storage after every change, so it's there to
+  // restore on the next visit. Reading each agent conversation's snapshot only when its
+  // `status`/`question` changed is enough - `applyResponse` (in `useAgentConversation`) always
+  // updates its resend history in the same tick, before those, so the snapshot is never stale
+  // when this runs.
+  useEffect(() => {
+    if (!project) return
+    WorkspaceChatStore.set(id, {
+      phaseIndex: agentFlow.phaseIndex,
+      phaseStarted,
+      scopeSpecification,
+      chatOpen,
+      conversation,
+      phaseAgent: phaseAgent.getSnapshot(),
+      phaseChatAgent: phaseChatAgent.getSnapshot(),
+      chatAgent: chatAgent.getSnapshot(),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    id,
+    project,
+    conversation,
+    phaseStarted,
+    scopeSpecification,
+    chatOpen,
+    agentFlow.phaseIndex,
+    phaseAgent.status,
+    phaseAgent.question,
+    phaseChatAgent.status,
+    phaseChatAgent.question,
+    chatAgent.status,
+    chatAgent.question,
+  ])
 
   const dedupeCounts = useMemo(() => {
     if (!project) return {}
@@ -134,8 +189,12 @@ export default function ProjectWorkspace() {
     return memory.length > 0 ? memory : undefined
   }
 
-  const appendTurn = useCallback((role, node) => {
-    setConversation((prev) => [...prev, { id: crypto.randomUUID(), role, node }])
+  // Turns are stored as plain data (kind + payload), not JSX - the transcript is persisted to
+  // localStorage (see the persist effect above), and JSX elements don't survive
+  // `JSON.stringify`/`JSON.parse`. `renderTurnBody` below turns a stored turn back into markup,
+  // for both freshly-appended turns and ones restored from a previous visit.
+  const appendTurn = useCallback((role, kind, payload = {}) => {
+    setConversation((prev) => [...prev, { id: crypto.randomUUID(), role, kind, payload }])
   }, [])
 
   const commitTitle = async () => {
@@ -211,60 +270,42 @@ export default function ProjectWorkspace() {
   const handleAction = (key) => {
     if (key === 'chat') {
       setChatOpen(true)
-      appendTurn(
-        'assistant',
-        <p>You can ask questions about the {totals.included} included papers below.</p>,
-      )
+      appendTurn('assistant', 'text', {
+        text: `You can ask questions about the ${totals.included} included papers below.`,
+      })
       return
     }
     if (key === 'summary') {
-      appendTurn('user', <p>Generate a summary of the {totals.included} included papers.</p>)
-      appendTurn(
-        'assistant',
-        <PlaceholderNotice
-          feature="Summary generation"
-          detail={`Once available, this will produce a synthesised summary of the ${totals.included} papers you've included.`}
-        />,
-      )
+      appendTurn('user', 'text', { text: `Generate a summary of the ${totals.included} included papers.` })
+      appendTurn('assistant', 'placeholder', {
+        feature: 'Summary generation',
+        detail: `Once available, this will produce a synthesised summary of the ${totals.included} papers you've included.`,
+      })
       return
     }
     if (key === 'gaps') {
-      appendTurn('user', <p>Find research gaps across the included papers.</p>)
-      appendTurn(
-        'assistant',
-        <PlaceholderNotice
-          feature="Research gap analysis"
-          detail="Once available, this will surface themes and methods that the included papers don't yet cover."
-        />,
-      )
+      appendTurn('user', 'text', { text: 'Find research gaps across the included papers.' })
+      appendTurn('assistant', 'placeholder', {
+        feature: 'Research gap analysis',
+        detail: "Once available, this will surface themes and methods that the included papers don't yet cover.",
+      })
       return
     }
     if (key === 'lit-review') {
-      appendTurn('user', <p>Write a full literature review from the included papers.</p>)
-      appendTurn(
-        'assistant',
-        <div>
-          <p>How would you like the review formatted?</p>
-          <FormatQuestionnaire
-            onSubmit={({ citationStyle, sections }) => {
-              appendTurn(
-                'user',
-                <p>
-                  {citationStyle} format, sections: {sections.join(', ')}.
-                </p>,
-              )
-              appendTurn(
-                'assistant',
-                <PlaceholderNotice
-                  feature="Literature review writing"
-                  detail={`The writing agent will draft a review formatted in ${citationStyle} style, covering: ${sections.join(', ')}.`}
-                />,
-              )
-            }}
-          />
-        </div>,
-      )
+      appendTurn('user', 'text', { text: 'Write a full literature review from the included papers.' })
+      appendTurn('assistant', 'format-questionnaire', {})
     }
+  }
+
+  // The `format-questionnaire` turn's submit handler - appends the user's picked format, then the
+  // (still placeholder) writing-agent response. Defined once here, rather than stored per-turn,
+  // since it isn't data - `renderTurnBody` wires it up fresh for every render.
+  const handleFormatSubmit = ({ citationStyle, sections }) => {
+    appendTurn('user', 'text', { text: `${citationStyle} format, sections: ${sections.join(', ')}.` })
+    appendTurn('assistant', 'placeholder', {
+      feature: 'Literature review writing',
+      detail: `The writing agent will draft a review formatted in ${citationStyle} style, covering: ${sections.join(', ')}.`,
+    })
   }
 
   // Renders one phase agent's completed/error response as a transcript turn: a "Thoughts"
@@ -275,7 +316,7 @@ export default function ProjectWorkspace() {
   // and `handlePhaseMessage` commits it to history once it's actually answered.
   const appendPhaseResult = (result) => {
     if (!result.ok) {
-      appendTurn('assistant', <p className="chat-error-text">{result.error}</p>)
+      appendTurn('assistant', 'error', { text: result.error })
       return
     }
     const { response } = result
@@ -284,13 +325,7 @@ export default function ProjectWorkspace() {
     const scope = agentFlow.phase?.key === 'scoping' ? tryParseScope(response.response) : null
     if (scope) setScopeSpecification(scope)
 
-    appendTurn(
-      'assistant',
-      <>
-        {response.reasoning && <AgentThoughts text={response.reasoning} />}
-        {scope ? <ScopeSummary specification={scope} /> : <p>{response.response}</p>}
-      </>,
-    )
+    appendTurn('assistant', 'agent-response', { reasoning: response.reasoning, scope, text: response.response })
   }
 
   const handleStartPhase = async () => {
@@ -308,9 +343,9 @@ export default function ProjectWorkspace() {
   // answer, before continuing the conversation.
   const handlePhaseMessage = async (text) => {
     if (phaseAgent.question) {
-      appendTurn('assistant', <p>{phaseAgent.question.question}</p>)
+      appendTurn('assistant', 'text', { text: phaseAgent.question.question })
     }
-    appendTurn('user', <p>{text}</p>)
+    appendTurn('user', 'text', { text })
     appendPhaseResult(await phaseAgent.send(text, buildPhaseMemory()))
   }
 
@@ -337,7 +372,7 @@ export default function ProjectWorkspace() {
   // applying a requested change) replaces the locally stored one, same as the scoping phase's own
   // completion does.
   const handlePhaseChatMessage = async (text) => {
-    appendTurn('user', <p>{text}</p>)
+    appendTurn('user', 'text', { text })
     const chatPhase = agentFlow.phase ?? AGENT_PHASES[AGENT_PHASES.length - 1]
     const memory = buildPhaseMemory()
     const result =
@@ -346,7 +381,7 @@ export default function ProjectWorkspace() {
         : await phaseChatAgent.send(text, memory)
 
     if (!result.ok) {
-      appendTurn('assistant', <p className="chat-error-text">{result.error}</p>)
+      appendTurn('assistant', 'error', { text: result.error })
       return
     }
 
@@ -357,19 +392,12 @@ export default function ProjectWorkspace() {
         : null
     if (scope) setScopeSpecification(scope)
 
-    appendTurn(
-      'assistant',
-      <>
-        {response.reasoning && <AgentThoughts text={response.reasoning} />}
-        {response.status === 'awaiting_input' ? (
-          <p>{response.question.question}</p>
-        ) : scope ? (
-          <ScopeSummary specification={scope} />
-        ) : (
-          <p>{response.response}</p>
-        )}
-      </>,
-    )
+    appendTurn('assistant', 'agent-response', {
+      reasoning: response.reasoning,
+      scope,
+      awaitingQuestion: response.status === 'awaiting_input' ? response.question.question : null,
+      text: response.response,
+    })
   }
 
   // In manual mode this talks to the standalone "chatbot" agent; in agent mode it's the current
@@ -377,21 +405,56 @@ export default function ProjectWorkspace() {
   const handleChatSend = async (text) => {
     if (workspaceMode === 'agent') return handlePhaseChatMessage(text)
 
-    appendTurn('user', <p>{text}</p>)
+    appendTurn('user', 'text', { text })
     const result =
       chatAgent.status === null
         ? await chatAgent.start('chatbot', text, includedPaperMemory)
         : await chatAgent.send(text, includedPaperMemory)
     if (result.ok) {
-      appendTurn(
-        'assistant',
-        <>
-          {result.response.reasoning && <AgentThoughts text={result.response.reasoning} />}
-          <p>{result.response.response}</p>
-        </>,
-      )
+      appendTurn('assistant', 'agent-response', {
+        reasoning: result.response.reasoning,
+        scope: null,
+        text: result.response.response,
+      })
     } else {
-      appendTurn('assistant', <p className="chat-error-text">{result.error}</p>)
+      appendTurn('assistant', 'error', { text: result.error })
+    }
+  }
+
+  // Turns a stored turn (see `appendTurn`) back into markup - used for both freshly-appended
+  // turns and ones restored from a previous visit.
+  const renderTurnBody = (turn) => {
+    switch (turn.kind) {
+      case 'text':
+        return <p>{turn.payload.text}</p>
+      case 'error':
+        return <p className="chat-error-text">{turn.payload.text}</p>
+      case 'placeholder':
+        return <PlaceholderNotice feature={turn.payload.feature} detail={turn.payload.detail} />
+      case 'format-questionnaire':
+        return (
+          <div>
+            <p>How would you like the review formatted?</p>
+            <FormatQuestionnaire onSubmit={handleFormatSubmit} />
+          </div>
+        )
+      case 'agent-response': {
+        const { reasoning, scope, awaitingQuestion, text } = turn.payload
+        return (
+          <>
+            {reasoning && <AgentThoughts text={reasoning} />}
+            {awaitingQuestion ? (
+              <p>{awaitingQuestion}</p>
+            ) : scope ? (
+              <ScopeSummary specification={scope} />
+            ) : (
+              <p>{text}</p>
+            )}
+          </>
+        )
+      }
+      default:
+        return null
     }
   }
 
@@ -504,7 +567,7 @@ export default function ProjectWorkspace() {
 
         {conversation.map((turn) => (
           <ChatTurn key={turn.id} role={turn.role} wide={turn.role === 'assistant'}>
-            {turn.node}
+            {renderTurnBody(turn)}
           </ChatTurn>
         ))}
 
