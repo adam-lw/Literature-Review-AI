@@ -173,6 +173,10 @@ def _process_one(paper_id: str, max_chars: int) -> tuple[str, str | None, str | 
     if status != "success":
         return status, full_text, tei_xml
 
+    # status == "success" guarantees both were set together above.
+    assert full_text is not None
+    assert tei_xml is not None
+
     if not is_already_chunked(paper_id):
         if chunks is None:
             _, chunks = extract_chunks(tei_xml, max_chars)

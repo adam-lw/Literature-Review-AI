@@ -210,4 +210,5 @@ def create_embedding_run(
                 f"user_tags={user_tags!r}, source={source!r} (run_id={existing[0]})"
             )
         row = conn.execute(insert_sql, params).fetchone()
+    assert row is not None
     return row[0]

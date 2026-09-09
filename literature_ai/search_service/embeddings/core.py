@@ -34,7 +34,7 @@ class EmbeddingModel(ABC):
 
 
 class OpenAiEmbedding(EmbeddingModel):
-    def __init__(self, model: str, **config: dict[str, Any]):
+    def __init__(self, model: str, **config: Any):
         load_dotenv()
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model = model

@@ -20,7 +20,7 @@ async def spawn_chatbot_agent(
     context: MessageLike, memory: Optional[dict[str, MemoryObject]] = None
 ):
 
-    response = await spawn_agent("chatbot", context=context, memory_objects=memory)
+    response = await spawn_agent("chatbot", instruction=context, memory_objects=memory)
     return response.as_text()
 
 
@@ -35,6 +35,6 @@ async def spawn_orchestrator_agent(
 ):
 
     response = await spawn_agent(
-        name="orchestrator", context=context, memory_objects=memory
+        name="orchestrator", instruction=context, memory_objects=memory
     )
     return response.as_text()

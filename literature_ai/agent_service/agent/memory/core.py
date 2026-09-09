@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
@@ -24,7 +25,7 @@ class MemoryObject:
         return f"{self.id}: a `{self.__class__.__name__}` memory object."
 
 
-def get_formatted_memory(memory: dict[str, MemoryObject]) -> str:
+def get_formatted_memory(memory: Optional[dict[str, MemoryObject]]) -> str:
     """Returns a string summarizing available memory objects for use by an LLM."""
     if not memory:
         return ""

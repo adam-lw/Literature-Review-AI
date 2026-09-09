@@ -9,7 +9,7 @@ ANTHROPIC_MODELS = ["claude-haiku-4-5", "claude-sonnet-5", "claude-opus-5"]
 
 
 class AnthropicLLM(LLM):
-    def __init__(self, model: str, **config: dict[str, Any]):
+    def __init__(self, model: str, **config: Any):
         self._validate_model(model=model)
         self.model = model
         self.client = AsyncAnthropic(
