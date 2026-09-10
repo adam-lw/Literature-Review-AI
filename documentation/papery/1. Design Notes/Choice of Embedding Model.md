@@ -1,3 +1,0 @@
-- OpenAI embeddings
-- SPECTER2 for scientific embeddings
-- Evaluated against local embeddings

@@ -220,6 +220,7 @@ __marimo__/
 artifacts/
 data/
 .vscode/
+documenation/
 
 # Frontend
 frontend/node_modules/
