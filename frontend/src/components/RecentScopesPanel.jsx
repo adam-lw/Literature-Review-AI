@@ -61,13 +61,15 @@ export default function RecentScopesPanel() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <button type="submit">Search</button>
+        <button type="submit" className="scope-search-btn">
+          Search
+        </button>
       </form>
 
       {loading && <p className="sidebar-status">Loading scopes…</p>}
       {error && <p className="sidebar-status error">{error}</p>}
       {!loading && !error && scopes.length === 0 && (
-        <p className="sidebar-status">No saved scopes yet.</p>
+        <p className="empty-state">No saved scopes yet.</p>
       )}
 
       <ul className="project-list">
