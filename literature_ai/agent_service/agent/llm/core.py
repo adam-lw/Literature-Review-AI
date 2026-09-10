@@ -13,9 +13,22 @@ class Message:
 
     role: str
     content: str
+    # Set when this turn was the model reaching for a tool: `content` is then the thinking that
+    # led to the call (often empty), not something to show a user. Kept structured so the call
+    # can be persisted on its own (app.tool_calls) and replayed later; providers only ever see
+    # `text()`'s flattened rendering, since this interface has no structured tool-call turn.
+    tool_call: Optional[ToolCall] = None
+
+    def text(self) -> str:
+        """This message as the LLM should see it - thinking plus, where there was one, the tool
+        call the model made after it."""
+        if self.tool_call is None:
+            return self.content
+        call = f"Called tool `{self.tool_call.name}` with arguments {self.tool_call.arguments}"
+        return f"{self.content}\n{call}" if self.content else call
 
     def to_dict(self) -> dict[str, str]:
-        return {"role": self.role, "content": self.content}
+        return {"role": self.role, "content": self.text()}
 
 
 @dataclass
@@ -72,8 +85,10 @@ class Messages:
         self._messages.append(message)
         return self
 
-    def add(self, content: str, role: str) -> "Messages":
-        return self.append(Message(role=role, content=content))
+    def add(
+        self, content: str, role: str, tool_call: Optional[ToolCall] = None
+    ) -> "Messages":
+        return self.append(Message(role=role, content=content, tool_call=tool_call))
 
     def add_system(self, content: str) -> "Messages":
         return self.append(Message(role="system", content=content))

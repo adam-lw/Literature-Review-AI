@@ -3,21 +3,24 @@ from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
+import literature_ai.agent_service.api.routers.generate_scope_description as generate_scope_description_router
+import literature_ai.agent_service.api.routers.generate_title as generate_title_router
 import literature_ai.app.api as app_api
 import literature_ai.app.api.routers.projects as projects_router
+import literature_ai.app.api.routers.scopes as scopes_router
 import literature_ai.search_service.api.routers.embedding_models as embedding_models_router
 import literature_ai.search_service.api.routers.search as search_router
 import main
 
 
-def _fake_project(project_id: uuid.UUID) -> dict:
+def _fake_project(project_id: uuid.UUID, project_mode: str = "human") -> dict:
     now = datetime.now(timezone.utc)
     return {
         "project_id": project_id,
         "project_title": "Untitled project (2026-08-03 12:00)",
-        "description": None,
         "inclusion_criteria": None,
         "embedding_run_id": 1,
+        "project_mode": project_mode,
         "created_at": now,
         "updated_at": now,
         "searches": [],
@@ -127,7 +130,7 @@ def test_app_api_projects_endpoints(monkeypatch):
         assert response.json()["results"][0]["included"] is True
 
         monkeypatch.setattr(
-            projects_router.db, "set_inclusion_bulk", lambda items: len(items)
+            projects_router.db, "set_inclusion_bulk", lambda pid, items: len(items)
         )
         response = client.patch(
             f"/projects/{project_id}/inclusion",
@@ -146,11 +149,275 @@ def test_app_api_projects_endpoints(monkeypatch):
         assert response.json()["included"] is False
 
 
+def test_create_agent_project(monkeypatch):
+    monkeypatch.setattr(app_api, "apply_schema", lambda path: None)
+    project_id = uuid.uuid4()
+
+    with TestClient(app_api.app) as client:
+        captured = {}
+
+        def fake_create_agent_project(inclusion_criteria=None, project_title=None):
+            captured["inclusion_criteria"] = inclusion_criteria
+            captured["project_title"] = project_title
+            return _fake_project(project_id, project_mode="agent")
+
+        monkeypatch.setattr(projects_router.db, "create_agent_project", fake_create_agent_project)
+
+        response = client.post(
+            "/projects/agent-mode",
+            json={"project_title": "Transformer architectures review"},
+        )
+        assert response.status_code == 200
+        assert response.json()["project_mode"] == "agent"
+        assert captured["project_title"] == "Transformer architectures review"
+
+
+def test_update_project_forwards_explicit_null(monkeypatch):
+    """Regression test: PATCH /projects/{id} with an explicit null for an allowed field must
+    reach db.update_project with that key present, not silently drop it - update_project's own
+    filter (persistence_handling.py) used to also strip None values, which meant a client could
+    never clear a field. The router-level `exclude_unset=True` is what should do the filtering,
+    not a second None-check on top of it."""
+    monkeypatch.setattr(app_api, "apply_schema", lambda path: None)
+    project_id = uuid.uuid4()
+
+    with TestClient(app_api.app) as client:
+        captured = {}
+
+        def fake_update_project(pid, **fields):
+            captured.update(fields)
+            return _fake_project(project_id)
+
+        monkeypatch.setattr(projects_router.db, "get_project", lambda pid: _fake_project(project_id))
+        monkeypatch.setattr(projects_router.db, "update_project", fake_update_project)
+
+        response = client.patch(f"/projects/{project_id}", json={"inclusion_criteria": None})
+        assert response.status_code == 200
+        assert "inclusion_criteria" in captured
+        assert captured["inclusion_criteria"] is None
+
+
+def test_project_conversations_and_scope_endpoints(monkeypatch):
+    monkeypatch.setattr(app_api, "apply_schema", lambda path: None)
+    project_id = uuid.uuid4()
+    conversation_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+
+    conversation = {
+        "conversation_id": conversation_id,
+        "project_id": project_id,
+        "stage": "scoping",
+        "mode": "agent",
+        "completed": False,
+        "author": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    with TestClient(app_api.app) as client:
+        monkeypatch.setattr(projects_router.db, "get_project", lambda pid: _fake_project(project_id))
+
+        def fake_get_conversation(pid, stage):
+            return conversation if stage == "scoping" else None
+
+        monkeypatch.setattr(projects_router.db, "get_conversation", fake_get_conversation)
+        monkeypatch.setattr(
+            projects_router.db,
+            "list_messages",
+            lambda cid: [{"role": "user", "content": "hello", "created_at": now}],
+        )
+
+        response = client.get(f"/projects/{project_id}/conversations")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["scoping"]["conversation"]["stage"] == "scoping"
+        assert len(body["scoping"]["messages"]) == 1
+        assert body["review"]["conversation"] is None
+        assert body["review"]["messages"] == []
+
+        monkeypatch.setattr(
+            projects_router.db,
+            "get_scope",
+            lambda cid: {
+                "scope_id": uuid.uuid4(),
+                "conversation_id": cid,
+                "content": {"research_questions": ["...?"]},
+                "scope_title": "Transformer architectures",
+                "scope_description": "A review of transformer-based approaches.",
+                "created_at": now,
+                "updated_at": now,
+            },
+        )
+        response = client.get(f"/projects/{project_id}/scope")
+        assert response.status_code == 200
+        body = response.json()
+        assert body["content"] == {"research_questions": ["...?"]}
+        assert body["scope_title"] == "Transformer architectures"
+        assert body["scope_description"] == "A review of transformer-based approaches."
+
+        completed_conversation = {**conversation, "completed": True}
+        monkeypatch.setattr(
+            projects_router.db,
+            "set_conversation_completed",
+            lambda cid, completed: None,
+        )
+        monkeypatch.setattr(
+            projects_router.db,
+            "get_conversation",
+            lambda pid, stage: completed_conversation if stage == "scoping" else None,
+        )
+        response = client.patch(f"/projects/{project_id}/conversations/scoping", json={"completed": True})
+        assert response.status_code == 200
+        assert response.json()["completed"] is True
+
+
+def test_update_project_scope_metadata(monkeypatch):
+    monkeypatch.setattr(app_api, "apply_schema", lambda path: None)
+    project_id = uuid.uuid4()
+    conversation_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+
+    conversation = {
+        "conversation_id": conversation_id,
+        "project_id": project_id,
+        "stage": "scoping",
+        "mode": "agent",
+        "completed": True,
+        "author": None,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    with TestClient(app_api.app) as client:
+        monkeypatch.setattr(projects_router.db, "get_project", lambda pid: _fake_project(project_id))
+        monkeypatch.setattr(
+            projects_router.db,
+            "get_conversation",
+            lambda pid, stage: conversation if stage == "scoping" else None,
+        )
+
+        captured = {}
+
+        def fake_set_scope_metadata(conversation_id, scope_title, scope_description):
+            captured["conversation_id"] = conversation_id
+            captured["scope_title"] = scope_title
+            captured["scope_description"] = scope_description
+            return {
+                "scope_id": uuid.uuid4(),
+                "conversation_id": conversation_id,
+                "content": {"research_questions": ["...?"]},
+                "scope_title": scope_title,
+                "scope_description": scope_description,
+                "created_at": now,
+                "updated_at": now,
+            }
+
+        monkeypatch.setattr(projects_router.db, "set_scope_metadata", fake_set_scope_metadata)
+
+        response = client.patch(
+            f"/projects/{project_id}/scope",
+            json={"scope_title": "Transformer architectures", "scope_description": "A review."},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["scope_title"] == "Transformer architectures"
+        assert body["scope_description"] == "A review."
+        assert captured["conversation_id"] == str(conversation_id)
+
+        monkeypatch.setattr(projects_router.db, "set_scope_metadata", lambda *a, **k: None)
+        response = client.patch(
+            f"/projects/{project_id}/scope",
+            json={"scope_title": "x", "scope_description": "y"},
+        )
+        assert response.status_code == 404
+
+
+def test_create_agent_project_from_scope(monkeypatch):
+    monkeypatch.setattr(app_api, "apply_schema", lambda path: None)
+    scope_id = uuid.uuid4()
+    new_project_id = uuid.uuid4()
+
+    with TestClient(app_api.app) as client:
+        captured = {}
+
+        def fake_create_agent_project_from_scope(scope_id_arg):
+            captured["scope_id"] = scope_id_arg
+            return _fake_project(new_project_id, project_mode="agent")
+
+        monkeypatch.setattr(
+            projects_router.db, "create_agent_project_from_scope", fake_create_agent_project_from_scope
+        )
+
+        response = client.post("/projects/agent-mode/from-scope", json={"scope_id": str(scope_id)})
+        assert response.status_code == 200
+        assert response.json()["project_id"] == str(new_project_id)
+        assert captured["scope_id"] == str(scope_id)
+
+        def fake_missing(scope_id_arg):
+            raise ValueError(f"No scope found for scope_id={scope_id_arg!r}")
+
+        monkeypatch.setattr(projects_router.db, "create_agent_project_from_scope", fake_missing)
+        response = client.post("/projects/agent-mode/from-scope", json={"scope_id": str(scope_id)})
+        assert response.status_code == 404
+
+
+def test_list_recent_scopes(monkeypatch):
+    monkeypatch.setattr(app_api, "apply_schema", lambda path: None)
+    scope_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+
+    with TestClient(app_api.app) as client:
+        captured = {}
+
+        def fake_list_recent_scopes(search=None, limit=10):
+            captured["search"] = search
+            captured["limit"] = limit
+            return [
+                {
+                    "scope_id": scope_id,
+                    "scope_title": "Transformer architectures",
+                    "scope_description": "A review of transformer-based approaches.",
+                    "content": {"research_questions": ["...?"]},
+                    "source_project_title": "Untitled project (2026-08-03 12:00)",
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            ]
+
+        monkeypatch.setattr(scopes_router.db, "list_recent_scopes", fake_list_recent_scopes)
+
+        response = client.get("/scopes", params={"search": "transformer"})
+        assert response.status_code == 200
+        scopes = response.json()["scopes"]
+        assert len(scopes) == 1
+        assert scopes[0]["scope_id"] == str(scope_id)
+        assert captured["search"] == "transformer"
+
+
 def test_main_combined_wiring(monkeypatch):
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
     monkeypatch.setattr(embedding_models_router, "ENGINE", _FakeEngine())
     monkeypatch.setattr(search_router, "vector_search", lambda **kwargs: [])
     monkeypatch.setattr(projects_router.db, "list_projects", lambda: [])
+
+    async def fake_generate_title(user_input: str) -> str:
+        return "A fake title"
+
+    async def fake_generate_scope_title(specification: dict) -> str:
+        return "A fake scope title"
+
+    async def fake_generate_scope_description_text(specification: dict) -> str:
+        return "A fake scope description"
+
+    monkeypatch.setattr(generate_title_router, "generate_title", fake_generate_title)
+    monkeypatch.setattr(
+        generate_scope_description_router, "generate_scope_title", fake_generate_scope_title
+    )
+    monkeypatch.setattr(
+        generate_scope_description_router,
+        "generate_scope_description_text",
+        fake_generate_scope_description_text,
+    )
 
     with TestClient(main.app) as client:
         response = client.get("/api/embedding-models")
@@ -164,6 +431,22 @@ def test_main_combined_wiring(monkeypatch):
         response = client.get("/api/projects")
         assert response.status_code == 200
         assert response.json()["projects"] == []
+
+        # Regression test: main.py is the actual deployed entrypoint (per Dockerfile/
+        # docker-compose.yml) and used to never register generate_title_router, so this
+        # endpoint silently 404'd in production despite working against the other app objects.
+        response = client.post("/api/generate-title", json={"user_input": "A review of transformers."})
+        assert response.status_code == 200
+        assert response.json()["title"] == "A fake title"
+
+        response = client.post(
+            "/api/generate-scope-description",
+            json={"specification": {"research_questions": ["...?"]}},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["scope_title"] == "A fake scope title"
+        assert body["scope_description"] == "A fake scope description"
 
 
 class _FakeResult:

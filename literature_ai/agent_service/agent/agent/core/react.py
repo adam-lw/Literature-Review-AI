@@ -68,10 +68,9 @@ class ReactAgent:
                     self.context, tools=list(self.tools.values())
                 )
 
-                if result.content:
-                    self.context.add(result.content, role="assistant")
-
                 if not result.tool_calls:
+                    if result.content:
+                        self.context.add(result.content, role="assistant")
                     return AgentResponse(
                         status="completed",
                         state=self.context,
@@ -89,10 +88,17 @@ class ReactAgent:
                     f"LLM requested {len(result.tool_calls)} tool call(s): "
                     f"{[tc.name for tc in result.tool_calls]}"
                 )
-                for tool_call in result.tool_calls:
+                for index, tool_call in enumerate(result.tool_calls):
+                    # A tool call and the thinking that led to it are one turn, so they share a
+                    # message - the call structured (persisted as its own app.tool_calls row),
+                    # the thinking as the content. That keeps a call like `ask_user` rebuildable
+                    # when a conversation is reloaded, instead of only surviving as text. Where
+                    # one turn made several calls, the thinking rides on the first of them
+                    # rather than being repeated against each.
                     self.context.add(
-                        f"Called tool `{tool_call.name}` with arguments {tool_call.arguments}",
+                        result.content if index == 0 and result.content else "",
                         role="assistant",
+                        tool_call=tool_call,
                     )
 
                     if tool_call.name == ASK_USER_TOOL.name:

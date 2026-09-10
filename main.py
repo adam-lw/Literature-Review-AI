@@ -10,6 +10,7 @@ from literature_ai.app.api.routers.projects import (
     results_router,
     router as projects_router,
 )
+from literature_ai.app.api.routers.scopes import router as scopes_router
 from literature_ai.agent_service.agent.tools import register_all_tools
 from literature_ai.search_service.api.routers.embedding_models import (
     router as embedding_models_router,
@@ -25,6 +26,12 @@ from literature_ai.search_service.api.routers.rag_paper_chunks import (
 )
 from literature_ai.agent_service.api.routers.invoke_agent import (
     router as invoke_agent_router,
+)
+from literature_ai.agent_service.api.routers.generate_title import (
+    router as generate_title_router,
+)
+from literature_ai.agent_service.api.routers.generate_scope_description import (
+    router as generate_scope_description_router,
 )
 from literature_ai.search_service.api.routers.search import router as search_router
 from literature_ai.db import apply_schema
@@ -49,10 +56,13 @@ app.include_router(full_paper_router, prefix="/api")
 app.include_router(keyword_search_router, prefix="/api")
 app.include_router(rag_paper_chunks_router, prefix="/api")
 app.include_router(invoke_agent_router, prefix="/api")
+app.include_router(generate_title_router, prefix="/api")
+app.include_router(generate_scope_description_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
 app.include_router(projects_router, prefix="/api")
 app.include_router(results_router, prefix="/api")
+app.include_router(scopes_router, prefix="/api")
 
 _dist = _REPO_ROOT / "frontend" / "dist"
 if _dist.exists():

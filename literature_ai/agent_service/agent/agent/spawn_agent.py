@@ -82,6 +82,28 @@ def _get_agent_settings(name: str) -> AgentSettings:
     )
 
 
+def _build_system_prompt(name: str, memory_objects: Optional[dict[str, MemoryObject]]) -> str:
+    """
+    Builds an agent's system prompt from scratch:
+    - react boilerplate prompt
+    - specific agent prompt / definition / instructions
+    - list available skills
+    - a summary of the agent's available memory objects (papers, generations, etc)
+
+    Always rebuilt fresh rather than cached/reused across turns, since `memory_objects`
+    legitimately changes turn to turn (e.g. review count, scope) - reusing a stale summary
+    would leave the agent describing memory as it was on the first call. Called by both
+    `spawn_agent` and `resume_agent` so a resumed conversation never has to trust a
+    client-resent copy of its own system prompt (see `resume_agent`'s docstring).
+    """
+    react_prompt = get_prompt("agent_core/react")
+    agent_prompt = get_prompt(f"agent_types/{name}")
+    skills = get_formatted_skills()
+    memory_summary = get_formatted_memory(memory_objects)
+    additional_information = get_agent_context_facts()
+    return "\n".join([react_prompt, agent_prompt, skills, memory_summary, additional_information])
+
+
 async def spawn_agent(
     name: str,
     instruction: MessageLike,
@@ -99,18 +121,7 @@ async def spawn_agent(
             f"config/core/agent/prompts/agent_types/{name}.md file."
         )
 
-    # build agent system prompt:
-    # - react boilerplate prompt
-    # - specific agent prompt / definition / instructions
-    # - list available skills
-    # - a summary of the agent's available memory objects (papers, generations, etc)
-    react_prompt = get_prompt("agent_core/react")
-    agent_prompt = get_prompt(f"agent_types/{name}")
-    skills = get_formatted_skills()
-    memory_summary = get_formatted_memory(memory_objects)
-    additional_information = get_agent_context_facts()
-
-    system_prompt = "\n".join([react_prompt, agent_prompt, skills, memory_summary, additional_information])
+    system_prompt = _build_system_prompt(name, memory_objects)
 
     # retrieve additional settings
     settings = _get_agent_settings(name)
@@ -134,13 +145,14 @@ async def resume_agent(
     memory_objects: Optional[dict[str, MemoryObject]] = None,
 ) -> AgentResponse:
     """
-    Resumes an agent from a previously returned `AgentResponse.state`.
+    Resumes an agent from prior conversation turns.
 
-    `history[0]` — the fully composed system prompt built by the original
-    `spawn_agent` call — seeds the fresh `ReactAgent`. The rest of `history`
-    plus the new `instruction` (appended as a user turn) are replayed into
-    its context via `run_agent`'s `content` parameter before it continues
-    iterating.
+    `history` holds only prior user/assistant/tool turns - no system-role entry. The system
+    prompt is rebuilt fresh from `(name, memory_objects)` via `_build_system_prompt`, the same
+    way `spawn_agent` builds it the first time, rather than trusting a client-resent copy (the
+    prior approach, `history[0].content`, both trusted client-supplied text as the system
+    prompt verbatim and kept reusing memory-summary text that was already stale by the second
+    turn). `instruction` is appended to `history` as a new user turn before replay.
     """
     if not is_registered_agent(name):
         raise ValueError(
@@ -149,18 +161,20 @@ async def resume_agent(
             f"config/core/agent/prompts/agent_types/{name}.md file."
         )
 
+    system_prompt = _build_system_prompt(name, memory_objects)
+
     settings = _get_agent_settings(name)
     llm = get_llm(settings.llm)
 
     agent = ReactAgent(
-        system_prompt=history[0].content,
+        system_prompt=system_prompt,
         llm=llm,
         tools=settings.tools,
         memory=memory_objects,
         allow_questions=settings.allow_questions,
     )
 
-    remainder = Messages(list(history)[1:])
+    remainder = Messages(list(history))
     remainder.add_user(instruction)
 
     return await agent.run_agent(content=remainder)

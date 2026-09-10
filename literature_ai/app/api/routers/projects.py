@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 
 from literature_ai.app import persistence_handling as db
@@ -34,6 +36,28 @@ def create_project(request: models.ProjectCreateRequest) -> models.ProjectOut:
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return models.ProjectOut(**project)
+
+
+@router.post("/agent-mode", response_model=models.ProjectOut)
+def create_agent_project(request: models.AgentProjectCreateRequest) -> models.ProjectOut:
+    project = db.create_agent_project(
+        inclusion_criteria=request.inclusion_criteria,
+        project_title=request.project_title,
+    )
+    return models.ProjectOut(**project)
+
+
+@router.post("/agent-mode/from-scope", response_model=models.ProjectOut)
+def create_agent_project_from_scope(
+    request: models.CreateProjectFromScopeRequest,
+) -> models.ProjectOut:
+    """Starts a brand-new agent project from a previously-saved scope, seeded to resume directly
+    at the review phase - see db.create_agent_project_from_scope."""
+    try:
+        project = db.create_agent_project_from_scope(str(request.scope_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return models.ProjectOut(**project)
 
 
@@ -93,7 +117,7 @@ def delete_search(project_id: str, search_id: str) -> None:
 @router.patch("/{project_id}/inclusion")
 def set_inclusion_bulk(project_id: str, request: models.InclusionBulkRequest) -> dict:
     _try_get_project(project_id)
-    count = db.set_inclusion_bulk([item.model_dump() for item in request.items])
+    count = db.set_inclusion_bulk(project_id, [item.model_dump() for item in request.items])
     return {"updated": count}
 
 
@@ -101,3 +125,93 @@ def set_inclusion_bulk(project_id: str, request: models.InclusionBulkRequest) ->
 def set_inclusion(result_id: str, request: models.InclusionUpdateRequest) -> dict:
     db.set_inclusion(result_id, request.included)
     return {"result_id": result_id, "included": request.included}
+
+
+def _conversation_with_messages(project_id: str, stage: str) -> models.ConversationWithMessagesOut:
+    conversation = db.get_conversation(project_id, stage)
+    if conversation is None:
+        return models.ConversationWithMessagesOut()
+    messages = db.list_messages(str(conversation["conversation_id"]))
+    return models.ConversationWithMessagesOut(
+        conversation=models.ConversationOut(**conversation),
+        messages=[models.MessageOut(**m) for m in messages],
+    )
+
+
+@router.get("/{project_id}/conversations", response_model=models.ProjectConversationsResponse)
+def get_project_conversations(project_id: str) -> models.ProjectConversationsResponse:
+    _try_get_project(project_id)
+    return models.ProjectConversationsResponse(
+        scoping=_conversation_with_messages(project_id, "scoping"),
+        review=_conversation_with_messages(project_id, "review"),
+        writing=_conversation_with_messages(project_id, "writing"),
+    )
+
+
+@router.patch("/{project_id}/conversations/{stage}", response_model=models.ConversationOut)
+def update_conversation(
+    project_id: str, stage: str, request: models.ConversationUpdateRequest
+) -> models.ConversationOut:
+    """Marks a stage's conversation completed (or not) - the "Continue" button in the phase-flow
+    UI calls this when advancing past a phase, so `phaseIndex`/`phaseStarted` can be reconstructed
+    on reload from which conversations are completed rather than needing their own client-side
+    persistence."""
+    _try_get_project(project_id)
+    conversation = db.get_conversation(project_id, stage)
+    if conversation is None:
+        raise HTTPException(
+            status_code=404, detail=f"No {stage!r} conversation found for project_id={project_id!r}"
+        )
+    db.set_conversation_completed(str(conversation["conversation_id"]), request.completed)
+    updated = db.get_conversation(project_id, stage)
+    assert updated is not None
+    return models.ConversationOut(**updated)
+
+
+@router.get("/{project_id}/scope", response_model=Optional[models.ScopeOut])
+def get_project_scope(project_id: str) -> models.ScopeOut | None:
+    _try_get_project(project_id)
+    conversation = db.get_conversation(project_id, "scoping")
+    if conversation is None:
+        return None
+    scope = db.get_scope(str(conversation["conversation_id"]))
+    return models.ScopeOut(**scope) if scope is not None else None
+
+
+@router.patch("/{project_id}/scope", response_model=models.ScopeOut)
+def update_project_scope(
+    project_id: str, request: models.ScopeMetadataUpdateRequest
+) -> models.ScopeOut:
+    """Sets the scope's LLM-generated title/description - called once the scoping phase is
+    marked completed (see generate-scope-description in agent_service)."""
+    _try_get_project(project_id)
+    conversation = db.get_conversation(project_id, "scoping")
+    if conversation is None:
+        raise HTTPException(
+            status_code=404, detail=f"No scoping conversation found for project_id={project_id!r}"
+        )
+    scope = db.set_scope_metadata(
+        str(conversation["conversation_id"]), request.scope_title, request.scope_description
+    )
+    if scope is None:
+        raise HTTPException(
+            status_code=404, detail=f"No scope found for project_id={project_id!r}"
+        )
+    return models.ScopeOut(**scope)
+
+
+@router.get("/{project_id}/written-papers", response_model=list[models.WrittenPaperOut])
+def list_written_papers(project_id: str) -> list[models.WrittenPaperOut]:
+    _try_get_project(project_id)
+    return [models.WrittenPaperOut(**p) for p in db.list_written_papers(project_id)]
+
+
+@router.post("/{project_id}/written-papers", response_model=models.WrittenPaperOut)
+def create_written_paper(
+    project_id: str, request: models.WrittenPaperCreateRequest
+) -> models.WrittenPaperOut:
+    _try_get_project(project_id)
+    paper = db.create_written_paper(
+        project_id, content=request.content, agent_version=request.agent_version
+    )
+    return models.WrittenPaperOut(**paper)

@@ -14,9 +14,13 @@ class ProjectCreateRequest(BaseModel):
     n_results: int = Field(10, ge=1, le=100)
 
 
+class AgentProjectCreateRequest(BaseModel):
+    inclusion_criteria: Optional[str] = None
+    project_title: Optional[str] = None
+
+
 class ProjectUpdateRequest(BaseModel):
     project_title: Optional[str] = None
-    description: Optional[str] = None
     inclusion_criteria: Optional[str] = None
     embedding_run_id: Optional[int] = Field(None, gt=0)
 
@@ -69,9 +73,9 @@ class SearchOut(BaseModel):
 class ProjectOut(BaseModel):
     project_id: UUID
     project_title: str
-    description: Optional[str] = None
     inclusion_criteria: Optional[str] = None
     embedding_run_id: Optional[int] = None
+    project_mode: str
     created_at: datetime
     updated_at: datetime
     searches: list[SearchOut] = []
@@ -80,9 +84,9 @@ class ProjectOut(BaseModel):
 class ProjectSummaryOut(BaseModel):
     project_id: UUID
     project_title: str
-    description: Optional[str] = None
     inclusion_criteria: Optional[str] = None
     embedding_run_id: Optional[int] = None
+    project_mode: str
     created_at: datetime
     updated_at: datetime
     search_count: int
@@ -92,6 +96,88 @@ class ProjectSummaryOut(BaseModel):
 
 class ProjectListResponse(BaseModel):
     projects: list[ProjectSummaryOut]
+
+
+class ConversationOut(BaseModel):
+    conversation_id: UUID
+    project_id: UUID
+    stage: str
+    mode: str
+    completed: bool
+    author: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MessageOut(BaseModel):
+    role: str
+    content: str
+    # Set when this turn made a tool call (see app.tool_calls): `content` is then the agent's
+    # thinking, not chat text, and the client renders the call itself - an `ask_user` question
+    # becomes a question card rather than a printed turn.
+    tool_name: Optional[str] = None
+    tool_arguments: Optional[dict] = None
+    created_at: datetime
+
+
+class ConversationWithMessagesOut(BaseModel):
+    conversation: Optional[ConversationOut] = None
+    messages: list[MessageOut] = []
+
+
+class ProjectConversationsResponse(BaseModel):
+    scoping: ConversationWithMessagesOut
+    review: ConversationWithMessagesOut
+    writing: ConversationWithMessagesOut
+
+
+class ConversationUpdateRequest(BaseModel):
+    completed: bool
+
+
+class ScopeOut(BaseModel):
+    content: dict
+    scope_title: Optional[str] = None
+    scope_description: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ScopeSummaryOut(BaseModel):
+    scope_id: UUID
+    scope_title: Optional[str] = None
+    scope_description: Optional[str] = None
+    content: dict
+    source_project_title: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ScopeListResponse(BaseModel):
+    scopes: list[ScopeSummaryOut]
+
+
+class ScopeMetadataUpdateRequest(BaseModel):
+    scope_title: str
+    scope_description: str
+
+
+class CreateProjectFromScopeRequest(BaseModel):
+    scope_id: UUID
+
+
+class WrittenPaperOut(BaseModel):
+    written_paper_id: UUID
+    project_id: UUID
+    agent_version: Optional[str] = None
+    content: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class WrittenPaperCreateRequest(BaseModel):
+    content: str
+    agent_version: Optional[str] = None
 
 
 class HealthResponse(BaseModel):

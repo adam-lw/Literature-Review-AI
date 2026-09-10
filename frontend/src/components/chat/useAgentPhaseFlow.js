@@ -31,6 +31,19 @@ export const AGENT_PHASES = [
   },
 ]
 
+// Maps every backend `stage` string (both a phase's own stage and its "_chat" companion) onto
+// app.conversations' 3-value stage enum (scoping|review|writing) - the two calls for a phase
+// share one persisted conversation server-side (see routers/invoke_agent.py's _STAGE_GROUP),
+// so this is what the frontend uses to fetch/complete that shared conversation by phase.
+export const STAGE_GROUP = {
+  scoping: 'scoping',
+  scoping_chat: 'scoping',
+  search_review: 'review',
+  review_chat: 'review',
+  writing: 'writing',
+  writing_chat: 'writing',
+}
+
 // Tracks which of the 3 phases an agent-mode project is on. Bookkeeping only - the phase's
 // actual agent conversation lives in a `useAgentConversation` instance the caller drives
 // alongside this, restarting it (via `.reset()`) whenever `advance` moves to the next phase.
