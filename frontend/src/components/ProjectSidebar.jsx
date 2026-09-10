@@ -14,8 +14,7 @@ function relativeDate(iso) {
 }
 
 export default function ProjectSidebar() {
-  const { projects, projectsLoading, projectsError, deleteProject, deleteAgentProject, isDemoMode } =
-    useProjects()
+  const { projects, projectsLoading, projectsError, deleteProject, isDemoMode } = useProjects()
   const navigate = useNavigate()
   const location = useLocation()
   const { id: activeId } = useParams()
@@ -30,11 +29,7 @@ export default function ProjectSidebar() {
   const handleDelete = async (event, project) => {
     event.stopPropagation()
     if (!window.confirm('Delete this project? This cannot be undone.')) return
-    if (project.mode === 'agent') {
-      await deleteAgentProject(project.project_id)
-    } else {
-      await deleteProject(project.project_id)
-    }
+    await deleteProject(project.project_id)
     if (activeId === project.project_id) navigate('/new/manual')
   }
 

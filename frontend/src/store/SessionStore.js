@@ -175,4 +175,21 @@ export const SessionStore = {
     const { runs } = await apiClient.get('/embedding-models')
     return runs
   },
+
+  // Demo/session-mode projects are never real app.projects rows (their project_id is just a
+  // client-generated UUID, nothing is ever inserted into Postgres for them), so the persisted
+  // 3-phase flow can't actually work here - a phaseAgent call would hit a foreign-key error
+  // server-side. These stubs exist only so ProjectWorkspace's unconditional on-load fetch of
+  // conversations/scope doesn't crash the *manual* search/review view for a demo project; they
+  // don't make demo mode's agent-flow toggle functional.
+  async getConversations() {
+    const empty = { conversation: null, messages: [] }
+    return { scoping: empty, review: empty, writing: empty }
+  },
+
+  async getScope() {
+    return null
+  },
+
+  async setConversationCompleted() {},
 }

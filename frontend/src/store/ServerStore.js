@@ -1,11 +1,12 @@
 import { apiClient } from '../api/client.js'
 
-// Normalises a server ProjectOut/ProjectSummaryOut into the shape shared by both stores.
-// The backend never returns a `mode` field (see literature_ai/app/api/models.py) — every
-// project reachable through this store was created via the manual flow, since agent projects
-// live in AgentLocalStore instead, so 'manual' is a safe constant here rather than a guess.
+// Normalises a server ProjectOut/ProjectSummaryOut into the shape shared across the app - just
+// renames `project_mode` (the backend's persisted, truthful field) to `mode`, the name every
+// route/component already reads (ProjectSidebar, AgentProjectWorkspace, ...). Every project -
+// agent-created or human-created alike - is a real `app.projects` row now, so this store is the
+// single source for both; there is no separate agent-project store any more.
 function normaliseProject(p) {
-  return { ...p, mode: 'manual' }
+  return { ...p, mode: p.project_mode }
 }
 
 export const ServerStore = {
@@ -20,6 +21,15 @@ export const ServerStore = {
       embedding_run_id,
       inclusion_criteria,
       n_results,
+    })
+    return normaliseProject(project)
+  },
+
+  async createAgentProject({ description, inclusion_criteria, project_title }) {
+    const project = await apiClient.post('/projects/agent-mode', {
+      description,
+      inclusion_criteria,
+      project_title,
     })
     return normaliseProject(project)
   },
@@ -57,5 +67,33 @@ export const ServerStore = {
   async listEmbeddingRuns() {
     const { runs } = await apiClient.get('/embedding-models')
     return runs
+  },
+
+  // Persisted 3-phase flow, backed by app.conversations/app.messages/app.scopes/app.reviews.
+  // The agent service (agent_service/api/routers/invoke_agent.py) writes none of this itself -
+  // it hands back what a turn produced (new_messages/scope/reviews on its response), and
+  // `usePhaseAgent.send` calls the three methods below to persist it, right after getting it.
+  async getConversations(projectId) {
+    return apiClient.get(`/projects/${projectId}/conversations`)
+  },
+
+  async addConversationMessages(projectId, stage, messages) {
+    return apiClient.post(`/projects/${projectId}/conversations/${stage}/messages`, { messages })
+  },
+
+  async getScope(projectId) {
+    return apiClient.get(`/projects/${projectId}/scope`)
+  },
+
+  async setScope(projectId, content) {
+    return apiClient.put(`/projects/${projectId}/scope`, { content })
+  },
+
+  async setReviews(projectId, reviews) {
+    return apiClient.put(`/projects/${projectId}/reviews`, { reviews })
+  },
+
+  async setConversationCompleted(projectId, stage, completed) {
+    return apiClient.patch(`/projects/${projectId}/conversations/${stage}`, { completed })
   },
 }
