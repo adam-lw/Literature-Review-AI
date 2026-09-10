@@ -135,6 +135,35 @@ class ConversationUpdateRequest(BaseModel):
     completed: bool
 
 
+class MessageCreateRequest(BaseModel):
+    role: str
+    content: str
+    tool_name: Optional[str] = None
+    tool_arguments: Optional[dict] = None
+
+
+class MessagesCreateRequest(BaseModel):
+    # Persists what one agent_service invoke-agent call produced - see
+    # agent_service/api/models.py's InvokeAgentResponse.new_messages, which this shape mirrors.
+    messages: list[MessageCreateRequest] = Field(..., min_length=1)
+
+
+class ScopeUpdateRequest(BaseModel):
+    content: dict
+
+
+class ReviewInput(BaseModel):
+    paper_id: str
+    reviewed: bool = False
+    included: bool = False
+    inclusion_reasoning: dict[str, dict] = Field(default_factory=dict)
+
+
+class ReviewsSetRequest(BaseModel):
+    # The complete current set of verdicts (not a diff) - see persistence_handling.set_reviews.
+    reviews: list[ReviewInput]
+
+
 class ScopeOut(BaseModel):
     content: dict
     scope_title: Optional[str] = None

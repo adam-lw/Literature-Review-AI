@@ -4,9 +4,8 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 import literature_ai.agent_service.api.routers.invoke_agent as invoke_agent_router
-from literature_ai.agent_service.agent.agent.core.response import AgentResponse, Question
+from literature_ai.agent_service.agent.agent.core.response import AgentResponse
 from literature_ai.agent_service.agent.llm.core import Message, Messages
-from literature_ai.agent_service.agent.tools import ToolCall
 import main
 
 
@@ -50,7 +49,9 @@ def _state_with(prior_pairs: list[tuple[str, str]], new_pairs: list[tuple[str, s
 
 def test_first_call_spawns_not_resumes(monkeypatch):
     """A stage's first turn (no persisted messages yet) must call spawn_agent, not resume_agent -
-    resuming an empty conversation would have nothing to resume."""
+    resuming an empty conversation would have nothing to resume. The agent service itself writes
+    nothing to Postgres (see invoke_agent.py) - it hands the new turns back in the response for
+    the caller to persist, so this only asserts on the HTTP response, not on any db.* call."""
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
     project_id = uuid.uuid4()
     conversation_id = uuid.uuid4()
@@ -75,11 +76,6 @@ def test_first_call_spawns_not_resumes(monkeypatch):
     monkeypatch.setattr(invoke_agent_router.db, "list_messages", lambda cid: [])
     monkeypatch.setattr(invoke_agent_router.db, "get_conversation", lambda pid, stage: None)
 
-    added = []
-    monkeypatch.setattr(
-        invoke_agent_router.db, "add_messages", lambda cid, messages: added.append((cid, messages))
-    )
-
     with TestClient(main.app) as client:
         response = client.post(
             "/api/invoke-agent",
@@ -88,28 +84,26 @@ def test_first_call_spawns_not_resumes(monkeypatch):
 
     assert response.status_code == 200
     assert calls == {"spawn": 1, "resume": 0}
-    assert added == [
-        (
-            str(conversation_id),
-            [
-                {"role": "user", "content": "hello", "tool_name": None, "tool_arguments": None},
-                {"role": "assistant", "content": "hi there", "tool_name": None, "tool_arguments": None},
-            ],
-        )
+    body = response.json()
+    # The project-scoped contract never resends history - `messages` stays empty - and hands
+    # back exactly the turns this call produced, for the caller to persist itself.
+    assert body["messages"] == []
+    assert body["conversation_id"] == str(conversation_id)
+    assert body["new_messages"] == [
+        {"role": "user", "content": "hello", "tool_name": None, "tool_arguments": None},
+        {"role": "assistant", "content": "hi there", "tool_name": None, "tool_arguments": None},
     ]
-    # The project-scoped contract never resends history - `messages` stays empty.
-    assert response.json()["messages"] == []
 
 
 def test_second_call_resumes_with_no_system_message_and_no_duplicate_turns(monkeypatch):
     """A stage's second turn must call resume_agent with `history` built purely from persisted
     prior turns (no synthetic system-role entry - spawn_agent/resume_agent now rebuild the system
-    prompt fresh from (stage, memory) themselves, see spawn_agent.py), and must persist only the
-    turns this call actually produced, not the replayed prior ones again."""
+    prompt fresh from (stage, memory) themselves, see spawn_agent.py), and the response's
+    `new_messages` must carry only the turns this call actually produced, not the replayed prior
+    ones again."""
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
     project_id = uuid.uuid4()
     conversation_id = uuid.uuid4()
-    now = datetime.now(timezone.utc)
 
     prior = [_row("user", "hello"), _row("assistant", "hi there")]
 
@@ -140,11 +134,6 @@ def test_second_call_resumes_with_no_system_message_and_no_duplicate_turns(monke
     monkeypatch.setattr(invoke_agent_router.db, "list_messages", lambda cid: prior)
     monkeypatch.setattr(invoke_agent_router.db, "get_conversation", lambda pid, stage: None)
 
-    added = []
-    monkeypatch.setattr(
-        invoke_agent_router.db, "add_messages", lambda cid, messages: added.append((cid, messages))
-    )
-
     with TestClient(main.app) as client:
         response = client.post(
             "/api/invoke-agent",
@@ -155,41 +144,40 @@ def test_second_call_resumes_with_no_system_message_and_no_duplicate_turns(monke
     assert calls == {"spawn": 0, "resume": 1}
     assert [m.role for m in captured_history["messages"]] == ["user", "assistant"]
     assert [m.content for m in captured_history["messages"]] == ["hello", "hi there"]
-    assert added == [
-        (
-            str(conversation_id),
-            [
-                {"role": "user", "content": "second message", "tool_name": None, "tool_arguments": None},
-                {"role": "assistant", "content": "second reply", "tool_name": None, "tool_arguments": None},
-            ],
-        )
+    assert response.json()["new_messages"] == [
+        {"role": "user", "content": "second message", "tool_name": None, "tool_arguments": None},
+        {"role": "assistant", "content": "second reply", "tool_name": None, "tool_arguments": None},
     ]
 
 
-def test_question_turn_persists_its_tool_call_not_its_text(monkeypatch):
-    """A turn that asked the user something must persist the `ask_user` call structurally (name +
-    arguments, for app.tool_calls) with only the agent's thinking as its content - otherwise the
-    call is flattened into text and reloading the conversation renders it as a chat message."""
+def test_question_turn_comes_back_structured_not_as_raw_tool_call_text(monkeypatch):
+    """A run that ends by asking the user something must hand back that turn as a structured
+    `tool_name`/`tool_arguments` pair, not the raw `Called tool \\`ask_user\\` with arguments
+    {...}` bookkeeping text `ReactAgent` puts in its own LLM-facing context - that flattened text
+    reaching the persisted transcript is exactly what rendered as a raw tool call in the UI."""
     monkeypatch.setattr(main, "apply_schema", lambda path: None)
     project_id = uuid.uuid4()
     conversation_id = uuid.uuid4()
-    arguments = {
-        "question": "Which databases should I search?",
-        "options": {"a": "PubMed", "b": "Scopus"},
-        "allows_freetext": True,
-    }
+    from literature_ai.agent_service.agent.agent.core.response import Question
 
     async def fake_spawn_agent(name, instruction, memory_objects=None):
+        # Matches react.py's actual shape for a turn that thinks and then calls a tool: the
+        # thinking lands as its own plain turn first, immediately followed by the flattened
+        # "Called tool ..." breadcrumb turn for the call itself.
         state = Messages()
         state.add_system("fake system prompt")
         state.add_user("hello")
+        state.add("I need to know the databases before searching.", role="assistant")
         state.add(
-            "I need to know the databases before searching.",
+            "Called tool `ask_user` with arguments "
+            "{'question': 'Which databases?', 'options': {'a': 'PubMed'}}",
             role="assistant",
-            tool_call=ToolCall(id="call_1", name="ask_user", arguments=arguments),
         )
         return AgentResponse(
-            status="awaiting_input", state=state, result=Question(**arguments)
+            status="awaiting_input",
+            state=state,
+            result=Question(question="Which databases?", options={"a": "PubMed"}),
+            reasoning="I need to know the databases before searching.",
         )
 
     monkeypatch.setattr(invoke_agent_router, "spawn_agent", fake_spawn_agent)
@@ -199,11 +187,6 @@ def test_question_turn_persists_its_tool_call_not_its_text(monkeypatch):
     monkeypatch.setattr(invoke_agent_router.db, "list_messages", lambda cid: [])
     monkeypatch.setattr(invoke_agent_router.db, "get_conversation", lambda pid, stage: None)
 
-    added = []
-    monkeypatch.setattr(
-        invoke_agent_router.db, "add_messages", lambda cid, messages: added.append((cid, messages))
-    )
-
     with TestClient(main.app) as client:
         response = client.post(
             "/api/invoke-agent",
@@ -211,65 +194,21 @@ def test_question_turn_persists_its_tool_call_not_its_text(monkeypatch):
         )
 
     assert response.status_code == 200
-    assert response.json()["question"]["question"] == arguments["question"]
-    _, persisted = added[0]
-    assert persisted[-1] == {
-        "role": "assistant",
-        "content": "I need to know the databases before searching.",
-        "tool_name": "ask_user",
-        "tool_arguments": arguments,
-    }
-
-
-def test_resumed_conversation_replays_tool_calls_structurally(monkeypatch):
-    """Persisted tool calls must come back as `ToolCall`s on resume, so an agent picking a
-    conversation back up sees the calls it already made rather than a gap in its context."""
-    monkeypatch.setattr(main, "apply_schema", lambda path: None)
-    project_id = uuid.uuid4()
-    conversation_id = uuid.uuid4()
-    arguments = {"question": "Which databases?", "options": {}, "allows_freetext": True}
-
-    prior = [
-        _row("user", "hello"),
+    body = response.json()
+    assert body["question"]["question"] == "Which databases?"
+    # The user turn plus exactly one structured ask_user turn - the leading plain-text thinking
+    # turn `ReactAgent` also persisted must be folded in here, not left behind as a duplicate.
+    assert body["new_messages"] == [
+        {"role": "user", "content": "hello", "tool_name": None, "tool_arguments": None},
         {
-            **_row("assistant", "I need the databases first."),
-            "tool_call_id": uuid.uuid4(),
+            "role": "assistant",
+            "content": "I need to know the databases before searching.",
             "tool_name": "ask_user",
-            "tool_arguments": arguments,
+            "tool_arguments": {
+                "question": "Which databases?",
+                "description": "",
+                "options": {"a": "PubMed"},
+                "allows_freetext": True,
+            },
         },
     ]
-
-    captured_history = {}
-
-    async def fake_resume_agent(name, history, instruction, memory_objects=None):
-        captured_history["messages"] = list(history)
-        state = _state_with(
-            [(m["role"], m["content"]) for m in prior], [("user", "PubMed"), ("assistant", "Searching PubMed.")]
-        )
-        return AgentResponse(
-            status="completed", state=state, result=Message(role="assistant", content="Searching PubMed.")
-        )
-
-    monkeypatch.setattr(invoke_agent_router, "resume_agent", fake_resume_agent)
-    monkeypatch.setattr(
-        invoke_agent_router.db, "get_or_create_conversation", lambda pid, stage, mode: _conversation(conversation_id)
-    )
-    monkeypatch.setattr(invoke_agent_router.db, "list_messages", lambda cid: prior)
-    monkeypatch.setattr(invoke_agent_router.db, "get_conversation", lambda pid, stage: None)
-    monkeypatch.setattr(invoke_agent_router.db, "add_messages", lambda cid, messages: None)
-
-    with TestClient(main.app) as client:
-        response = client.post(
-            "/api/invoke-agent",
-            json={"stage": "scoping", "project_id": str(project_id), "message": "PubMed"},
-        )
-
-    assert response.status_code == 200
-    replayed = captured_history["messages"][-1]
-    assert replayed.tool_call == ToolCall(
-        id=str(prior[1]["tool_call_id"]), name="ask_user", arguments=arguments
-    )
-    # The LLM still sees the call, rendered into the turn's text alongside the thinking.
-    assert replayed.to_dict()["content"] == (
-        f"I need the databases first.\nCalled tool `ask_user` with arguments {arguments}"
-    )

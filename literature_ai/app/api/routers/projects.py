@@ -168,6 +168,25 @@ def update_conversation(
     return models.ConversationOut(**updated)
 
 
+@router.post(
+    "/{project_id}/conversations/{stage}/messages",
+    response_model=models.ConversationWithMessagesOut,
+)
+def add_conversation_messages(
+    project_id: str, stage: str, request: models.MessagesCreateRequest
+) -> models.ConversationWithMessagesOut:
+    """Appends turns an agent_service invoke-agent call produced (see that service's
+    `InvokeAgentResponse.new_messages`) to a stage's conversation - the agent service itself
+    writes no conversation content to Postgres, so this is how the caller persists what it got
+    back, right after it gets it. Creates the conversation if this is its very first turn."""
+    _try_get_project(project_id)
+    conversation = db.get_or_create_conversation(project_id, stage, "agent")
+    db.add_messages(
+        str(conversation["conversation_id"]), [m.model_dump() for m in request.messages]
+    )
+    return _conversation_with_messages(project_id, stage)
+
+
 @router.get("/{project_id}/scope", response_model=Optional[models.ScopeOut])
 def get_project_scope(project_id: str) -> models.ScopeOut | None:
     _try_get_project(project_id)
@@ -198,6 +217,37 @@ def update_project_scope(
             status_code=404, detail=f"No scope found for project_id={project_id!r}"
         )
     return models.ScopeOut(**scope)
+
+
+@router.put("/{project_id}/scope", response_model=models.ScopeOut)
+def set_project_scope(project_id: str, request: models.ScopeUpdateRequest) -> models.ScopeOut:
+    """Persists a scope specification an invoke-agent call handed back (`InvokeAgentResponse.
+    scope`) - see the scoping phase's `_run_phase_agent` for when that's set. Creates the
+    scoping conversation if it doesn't exist yet (finalizing a scope is always that
+    conversation's first turn or later)."""
+    _try_get_project(project_id)
+    conversation = db.get_or_create_conversation(project_id, "scoping", "agent")
+    scope = db.upsert_scope(str(conversation["conversation_id"]), request.content)
+    return models.ScopeOut(**scope)
+
+
+@router.put("/{project_id}/reviews")
+def set_project_reviews(project_id: str, request: models.ReviewsSetRequest) -> dict:
+    """Persists the review stage's current verdicts an invoke-agent call handed back
+    (`InvokeAgentResponse.reviews`) - a wholesale replacement, not a diff, matching
+    `set_reviews`."""
+    _try_get_project(project_id)
+    conversation = db.get_or_create_conversation(project_id, "review", "agent")
+    reviews = {
+        r.paper_id: {
+            "reviewed": r.reviewed,
+            "included": r.included,
+            "inclusion_reasoning": r.inclusion_reasoning,
+        }
+        for r in request.reviews
+    }
+    db.set_reviews(str(conversation["conversation_id"]), reviews)
+    return {"updated": len(reviews)}
 
 
 @router.get("/{project_id}/written-papers", response_model=list[models.WrittenPaperOut])
