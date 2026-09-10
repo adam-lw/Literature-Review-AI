@@ -64,6 +64,14 @@ export default function AgentProjectWorkspace() {
   // Whichever phaseAgent call (start or send) most recently failed, so the retry button in
   // `renderAgentBottom` can redo exactly that call instead of restarting the phase from scratch.
   const lastPhaseActionRef = useRef(null)
+  // Guards the initial `load()` effect below against the same StrictMode double-invoke as
+  // `startedPhaseKeyRef` above, keyed by project id so navigating to a different project still
+  // reloads. Without this, the second concurrent `load()` call resolves after the phase-start
+  // effect has already appended the opening user turn and kicked off its agent call, and its
+  // `setConversation(restored)` (still reflecting the pre-call, message-less conversation) wipes
+  // that turn back out - and resets `startedPhaseKeyRef.current` to null, so the phase-start
+  // effect fires *again*, duplicating both the transcript turn and the agent call.
+  const loadedIdRef = useRef(null)
 
   // This project defaults to Agent mode every time it's (re-)opened; the slider can flip
   // it to Manual mode from here on, live, for the rest of this visit.
@@ -136,9 +144,11 @@ export default function AgentProjectWorkspace() {
   }, [store, id])
 
   useEffect(() => {
+    if (loadedIdRef.current === id) return
+    loadedIdRef.current = id
     load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [load])
+  }, [id, load])
 
   const commitTitle = async () => {
     setEditingTitle(false)
@@ -195,6 +205,7 @@ export default function AgentProjectWorkspace() {
   const handleStartPhase = () => {
     setPhaseStarted(true)
     const content = agentFlow.phase.key === 'scoping' ? (initialDescription ?? '') : ''
+    if (content) appendTurn('user', 'text', { text: content, lede: 'Research Description:' })
     return runPhaseAction(() => phaseAgent.send(agentFlow.phase.stage, content))
   }
 
@@ -327,7 +338,12 @@ export default function AgentProjectWorkspace() {
   const renderTurnBody = (turn) => {
     switch (turn.kind) {
       case 'text':
-        return <p>{turn.payload.text}</p>
+        return (
+          <>
+            {turn.payload.lede && <p className="turn-lede">{turn.payload.lede}</p>}
+            <p>{turn.payload.text}</p>
+          </>
+        )
       case 'error':
         return <p className="chat-error-text">{turn.payload.text}</p>
       case 'placeholder':
@@ -381,7 +397,7 @@ export default function AgentProjectWorkspace() {
       return (
         <ChatTurn role="assistant" wide>
           <div className="agent-error-block">
-            <p className="chat-error-text">Something went wrong reaching the agent. Nothing was sent twice - retry when you're ready.</p>
+            <p className="chat-error-text">Something went wrong reaching the agent. Please try again</p>
             <button type="button" className="retry-btn" onClick={retryLastPhaseAction}>
               Retry
             </button>

@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom'
 import { useProjects } from '../context/ProjectsContext.jsx'
 import { useWorkspaceMode } from '../context/WorkspaceModeContext.jsx'
 import { paperListMemory } from '../api/agentClient.js'
-import CriteriaEditor from '../components/CriteriaEditor.jsx'
 import ResultsPanel from '../components/ResultsPanel.jsx'
 import ChatTurn from '../components/chat/ChatTurn.jsx'
 import ActionBar from '../components/chat/ActionBar.jsx'
@@ -181,12 +180,6 @@ export default function ProjectWorkspace() {
     const updated = await store.updateProject(id, { project_title: trimmed })
     setProject(updated)
     refreshProjects()
-  }
-
-  const commitCriteria = async (value) => {
-    if (!project || value === (project.inclusion_criteria ?? '')) return
-    const updated = await store.updateProject(id, { inclusion_criteria: value || null })
-    setProject(updated)
   }
 
   const handleAddTerm = async (e) => {
@@ -507,13 +500,6 @@ export default function ProjectWorkspace() {
         )}
 
         <ChatTurn role="assistant" wide>
-          <label className="field-label">Inclusion / exclusion criteria</label>
-          <CriteriaEditor
-            value={project.inclusion_criteria}
-            onChange={(v) => setProject((prev) => ({ ...prev, inclusion_criteria: v }))}
-            onBlur={(e) => commitCriteria(e.target.value)}
-          />
-
           <form className="add-term-form" onSubmit={handleAddTerm}>
             <input
               type="text"

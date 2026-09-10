@@ -42,6 +42,11 @@ export function reconstructConversation(messages, { isScopingStage = false } = {
   const push = (role, kind, payload) => turns.push({ id: crypto.randomUUID(), role, kind, payload })
 
   while (i < messages.length) {
+    // The very first persisted message of the scoping conversation is always the project
+    // description typed on the landing page (see AgentProjectWorkspace's `handleStartPhase`,
+    // which labels it the same way live) - flagged here so a reloaded conversation renders the
+    // same "Research Description:" lede instead of just the bare text.
+    const isResearchDescription = isScopingStage && i === 0
     let userText = null
     if (messages[i]?.role === 'user') {
       userText = messages[i].content
@@ -53,7 +58,9 @@ export function reconstructConversation(messages, { isScopingStage = false } = {
     const runMessages = messages.slice(runStart, i)
     const isLastRun = i >= messages.length
 
-    if (userText !== null) push('user', 'text', { text: userText })
+    if (userText !== null) {
+      push('user', 'text', { text: userText, lede: isResearchDescription ? 'Research Description:' : null })
+    }
 
     const assistantMessages = runMessages.filter((m) => m.role === 'assistant')
     const toolCalls = assistantMessages.filter(isToolCall)
