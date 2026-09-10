@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useReducer } from 'react'
 import { store, isDemoMode } from '../store/index.js'
-import { AgentLocalStore } from '../store/AgentLocalStore.js'
 
 const ProjectsContext = createContext(null)
 
@@ -38,13 +37,9 @@ export function ProjectsProvider({ children }) {
   const refreshProjects = useCallback(async () => {
     dispatch({ type: 'projects/loading' })
     try {
-      const [serverProjects, agentProjects] = await Promise.all([
-        store.listProjects(),
-        Promise.resolve(AgentLocalStore.listProjects()),
-      ])
-      const projects = [...serverProjects, ...agentProjects].sort(
-        (a, b) => new Date(b.created_at) - new Date(a.created_at),
-      )
+      // All projects - agent-created or human-created - are app.projects rows now, sorted
+      // server-side; `store` alone (Server or Session, see store/index.js) is the whole list.
+      const projects = await store.listProjects()
       dispatch({ type: 'projects/loaded', projects })
     } catch (error) {
       dispatch({ type: 'projects/error', error: error.message })
@@ -85,26 +80,18 @@ export function ProjectsProvider({ children }) {
 
   const createAgentProject = useCallback(
     async (payload) => {
-      const project = AgentLocalStore.createProject(payload)
+      const project = await store.createAgentProject(payload)
       await refreshProjects()
       return project
     },
     [refreshProjects],
   )
 
-  const updateAgentProject = useCallback(
-    async (id, patch) => {
-      const project = AgentLocalStore.updateProject(id, patch)
-      refreshProjects()
-      return project
-    },
-    [refreshProjects],
-  )
-
-  const deleteAgentProject = useCallback(
-    async (id) => {
-      AgentLocalStore.deleteProject(id)
+  const createAgentProjectFromScope = useCallback(
+    async (scopeId) => {
+      const project = await store.createAgentProjectFromScope(scopeId)
       await refreshProjects()
+      return project
     },
     [refreshProjects],
   )
@@ -118,9 +105,7 @@ export function ProjectsProvider({ children }) {
     createProject,
     deleteProject,
     createAgentProject,
-    updateAgentProject,
-    deleteAgentProject,
-    getAgentProject: AgentLocalStore.getProject,
+    createAgentProjectFromScope,
   }
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>

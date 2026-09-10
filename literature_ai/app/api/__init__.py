@@ -8,6 +8,7 @@ from literature_ai.app.api.routers.projects import (
     results_router,
     router as projects_router,
 )
+from literature_ai.app.api.routers.scopes import router as scopes_router
 from literature_ai.db import apply_schema
 
 
@@ -29,3 +30,4 @@ app = FastAPI(
 app.include_router(health_router)
 app.include_router(projects_router)
 app.include_router(results_router)
+app.include_router(scopes_router)

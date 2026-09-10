@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useLocation, useParams } from 'react-router-dom'
 import { useProjects } from '../context/ProjectsContext.jsx'
 import { useWorkspaceMode } from '../context/WorkspaceModeContext.jsx'
-import { scopingMemory } from '../api/agentClient.js'
+import { generateScopeDescription } from '../api/agentClient.js'
 import ChatTurn from '../components/chat/ChatTurn.jsx'
 import ActionBar from '../components/chat/ActionBar.jsx'
 import ChatComposer from '../components/chat/ChatComposer.jsx'
@@ -11,32 +11,48 @@ import AgentContinueBar from '../components/chat/AgentContinueBar.jsx'
 import AgentQuestion from '../components/chat/AgentQuestion.jsx'
 import AgentThoughts from '../components/chat/AgentThoughts.jsx'
 import ScopeSummary from '../components/chat/ScopeSummary.jsx'
-import { AGENT_PHASES, useAgentPhaseFlow } from '../components/chat/useAgentPhaseFlow.js'
+import { AGENT_PHASES, STAGE_GROUP, useAgentPhaseFlow } from '../components/chat/useAgentPhaseFlow.js'
+import { usePhaseAgent } from '../components/chat/usePhaseAgent.js'
 import { useAgentConversation } from '../components/chat/useAgentConversation.js'
+import { reconstructConversation } from '../components/chat/reconstructConversation.js'
 import { tryParseScope } from '../components/chat/scopeMemory.js'
+
+const GROUP_ORDER = ['scoping', 'review', 'writing']
 
 export default function AgentProjectWorkspace() {
   const { id } = useParams()
-  const { getAgentProject, updateAgentProject } = useProjects()
+  const location = useLocation()
+  // Only present the moment we're navigated here right after project creation (see
+  // AgentLandingPage.jsx) - not persisted server-side, since it's only ever needed once, as the
+  // scoping phase's opening instruction; the message it produces is what actually persists it.
+  const initialDescription = location.state?.initialDescription
+  const { store, refreshProjects } = useProjects()
   const { workspaceMode, setWorkspaceMode, clearWorkspaceMode } = useWorkspaceMode()
   const [project, setProject] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [titleDraft, setTitleDraft] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [conversation, setConversation] = useState([])
   const [chatOpen, setChatOpen] = useState(false)
   const [phaseStarted, setPhaseStarted] = useState(false)
   // The scoping phase's finalized JSON specification (see `scopeMemory.js`) - once set, it's
-  // resent as memory to every later phase/chat, and can itself be updated by scoping_chat.
+  // resent as memory to every later phase/chat, and can itself be updated by scoping_chat. Now
+  // loaded from app.scopes on mount rather than resent by the caller on every call.
   const [scopeSpecification, setScopeSpecification] = useState(null)
 
   const agentFlow = useAgentPhaseFlow()
-  // One phase = one agent conversation: `phaseAgent` is reset (fresh create_agent call) every
-  // time `agentFlow` advances to a new phase, and drives that phase's own Q&A. `phaseChatAgent`
-  // is the separate "Chat with AI" conversation for the current phase, talking to its
-  // `<phase>_chat` stage instead of the phase's own. `chatAgent` is the separate freeform
-  // "chatbot" conversation opened from manual mode's action bar.
-  const phaseAgent = useAgentConversation()
-  const phaseChatAgent = useAgentConversation()
+  // `phaseAgent` drives the current phase's own auto-progression + question-answering;
+  // `phaseChatAgent` is the separate "Chat with AI" conversation for the current phase. Both
+  // call the same persisted conversation server-side once their stage/chatStage resolve to the
+  // same group (see STAGE_GROUP) - there's no client-held history any more, just per-call UI
+  // state (sending/status/question), so nothing here needs snapshotting/hydrating on reload.
+  const phaseAgent = usePhaseAgent(id)
+  const phaseChatAgent = usePhaseAgent(id)
+  // The freeform "chatbot" conversation opened from manual mode's action bar - unaffected by
+  // this migration, still the legacy fully-stateless contract. It has no backing store any
+  // more (WorkspaceChatStore/AgentLocalStore are gone), so it simply doesn't survive a reload -
+  // an accepted, narrow regression for this one freeform side-conversation.
   const chatAgent = useAgentConversation()
 
   // Guards the phase auto-start effect below against firing twice for the same phase - a plain
@@ -57,81 +73,72 @@ export default function AgentProjectWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // Loading a project restores its persisted `agentState` (see the persist effect below) rather
-  // than wiping the transcript back to empty - a project that was already mid-conversation stays
-  // mid-conversation when reselected. Restoring never issues a request: `hydrate` only sets local
-  // state, and `startedPhaseKeyRef` is seeded to match the restored phase whenever it was already
-  // started, so the auto-start effect further down sees nothing new to kick off and leaves it
-  // alone. Only a project with no persisted state (never opened before) starts blank, which is
-  // what lets that effect fire its one legitimate opening call.
-  useEffect(() => {
-    const p = getAgentProject(id)
-    setProject(p)
-    setTitleDraft(p?.project_title ?? '')
+  // Loads the project plus its persisted conversations/scope from the backend and reconstructs
+  // local UI state from them - the transcript, which phase we're on, and whether that phase has
+  // already started. Nothing here issues an agent call: reconstructing "already started" (from
+  // whether a phase's conversation has any messages) and seeding `startedPhaseKeyRef` to match
+  // is what keeps the auto-start effect below from re-issuing an opening call for a phase that's
+  // already under way.
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
     lastPhaseActionRef.current = null
+    try {
+      const [p, conversations, scope] = await Promise.all([
+        store.getProject(id),
+        store.getConversations(id),
+        store.getScope(id),
+      ])
+      if (!p) {
+        setError('Agent project not found.')
+        return
+      }
+      setProject(p)
+      setTitleDraft(p.project_title)
+      setScopeSpecification(scope?.content ?? null)
 
-    const saved = p?.agentState
-    if (saved) {
-      setConversation(saved.conversation ?? [])
-      setChatOpen(saved.chatOpen ?? false)
-      setPhaseStarted(saved.phaseStarted ?? false)
-      setScopeSpecification(saved.scopeSpecification ?? null)
-      agentFlow.goTo(saved.phaseIndex ?? 0)
-      phaseAgent.hydrate(saved.phaseAgent)
-      phaseChatAgent.hydrate(saved.phaseChatAgent)
-      chatAgent.hydrate(saved.chatAgent)
-      startedPhaseKeyRef.current = saved.phaseStarted
-        ? (AGENT_PHASES[saved.phaseIndex ?? 0]?.key ?? null)
-        : null
-    } else {
-      setConversation([])
+      const restored = GROUP_ORDER.map((group) => ({
+        group,
+        ...reconstructConversation(conversations[group]?.messages ?? [], { isScopingStage: group === 'scoping' }),
+      }))
+      setConversation(restored.flatMap((r) => r.turns))
+
+      let resumeIndex = AGENT_PHASES.length
+      for (let i = 0; i < AGENT_PHASES.length; i++) {
+        const group = STAGE_GROUP[AGENT_PHASES[i].stage]
+        if (!conversations[group]?.conversation?.completed) {
+          resumeIndex = i
+          break
+        }
+      }
+      agentFlow.goTo(resumeIndex)
+
+      const currentGroup = resumeIndex < AGENT_PHASES.length ? STAGE_GROUP[AGENT_PHASES[resumeIndex].stage] : null
+      const started = currentGroup ? (conversations[currentGroup]?.messages?.length ?? 0) > 0 : false
+      setPhaseStarted(started)
+      startedPhaseKeyRef.current = started ? (AGENT_PHASES[resumeIndex]?.key ?? null) : null
+
       setChatOpen(false)
-      setPhaseStarted(false)
-      setScopeSpecification(null)
-      agentFlow.goTo(0)
       phaseAgent.reset()
       phaseChatAgent.reset()
       chatAgent.reset()
-      startedPhaseKeyRef.current = null
+
+      // A question the current phase asked but never got an answer to goes back to being a live
+      // question card, rather than the phase looking like it simply stopped mid-conversation.
+      const pending = restored.find((r) => r.group === currentGroup)?.pendingQuestion
+      if (pending) phaseAgent.restoreQuestion(pending)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, getAgentProject])
+  }, [store, id])
 
-  // Mirrors the workspace's full resumable state back to storage after every change, so it's
-  // there to restore on the next visit. Reading each agent conversation's snapshot only when its
-  // `status`/`question` changed is enough - `applyResponse` (in `useAgentConversation`) always
-  // updates its resend history in the same tick, before those, so the snapshot is never stale
-  // when this runs.
   useEffect(() => {
-    if (!project) return
-    updateAgentProject(id, {
-      agentState: {
-        phaseIndex: agentFlow.phaseIndex,
-        phaseStarted,
-        scopeSpecification,
-        chatOpen,
-        conversation,
-        phaseAgent: phaseAgent.getSnapshot(),
-        phaseChatAgent: phaseChatAgent.getSnapshot(),
-        chatAgent: chatAgent.getSnapshot(),
-      },
-    })
+    load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    id,
-    project,
-    conversation,
-    phaseStarted,
-    scopeSpecification,
-    chatOpen,
-    agentFlow.phaseIndex,
-    phaseAgent.status,
-    phaseAgent.question,
-    phaseChatAgent.status,
-    phaseChatAgent.question,
-    chatAgent.status,
-    chatAgent.question,
-  ])
+  }, [load])
 
   const commitTitle = async () => {
     setEditingTitle(false)
@@ -140,21 +147,17 @@ export default function AgentProjectWorkspace() {
       setTitleDraft(project?.project_title ?? '')
       return
     }
-    const updated = await updateAgentProject(id, { project_title: trimmed })
+    const updated = await store.updateProject(id, { project_title: trimmed })
     setProject(updated)
+    refreshProjects()
   }
 
-  // Turns are stored as plain data (kind + payload), not JSX - the transcript is persisted to
-  // localStorage (see the persist effect above), and JSX elements don't survive
-  // `JSON.stringify`/`JSON.parse`. `renderTurnBody` below turns a stored turn back into markup,
-  // for both freshly-appended turns and ones restored from a previous visit.
+  // Turns are stored as plain data (kind + payload), not JSX - `renderTurnBody` below turns a
+  // stored turn back into markup, for both freshly-appended turns and ones reconstructed from
+  // persisted messages on load (see `reconstructConversation`).
   const appendTurn = useCallback((role, kind, payload = {}) => {
     setConversation((prev) => [...prev, { id: crypto.randomUUID(), role, kind, payload }])
   }, [])
-
-  // Every phase after scoping (and every phase's chat) gets the finalized scope spec as memory,
-  // once one exists.
-  const buildPhaseMemory = () => (scopeSpecification ? [scopingMemory(scopeSpecification)] : undefined)
 
   // Renders one phase agent's *successful* response as a transcript turn: a "Thoughts" disclosure
   // when the turn carried reasoning, then either a friendly scope summary card (when the scoping
@@ -174,9 +177,9 @@ export default function AgentProjectWorkspace() {
     appendTurn('assistant', 'agent-response', { reasoning: response.reasoning, scope, text: response.response })
   }
 
-  // Runs one phaseAgent call (start or send), remembering it in `lastPhaseActionRef` so a failure
-  // can be retried verbatim from `renderAgentBottom` without redoing the transcript writes the
-  // caller already made (which would otherwise duplicate turns and re-send the request).
+  // Runs one phaseAgent call, remembering it in `lastPhaseActionRef` so a failure can be retried
+  // verbatim from `renderAgentBottom` without redoing the transcript writes the caller already
+  // made (which would otherwise duplicate turns and re-send the request).
   const runPhaseAction = async (action) => {
     lastPhaseActionRef.current = action
     const result = await action()
@@ -185,12 +188,14 @@ export default function AgentProjectWorkspace() {
 
   // Only the scoping phase should restate the original research description as its opening
   // instruction - later phases (search_review, writing) source their input purely from the
-  // scope memory `buildPhaseMemory()` attaches below, so they start with no user instruction at
-  // all (`ReactAgent.run_agent` skips adding a user turn for falsy content).
+  // scope the backend already loaded server-side, so they start with no user instruction at all
+  // (`ReactAgent.run_agent` skips adding a user turn for falsy content). A project started from
+  // an existing scope has no fresh description at all - its scoping phase is already marked
+  // completed server-side, so this branch never fires for it.
   const handleStartPhase = () => {
     setPhaseStarted(true)
-    const content = agentFlow.phase.key === 'scoping' ? project.description : ''
-    return runPhaseAction(() => phaseAgent.start(agentFlow.phase.stage, content, buildPhaseMemory()))
+    const content = agentFlow.phase.key === 'scoping' ? (initialDescription ?? '') : ''
+    return runPhaseAction(() => phaseAgent.send(agentFlow.phase.stage, content))
   }
 
   const retryLastPhaseAction = () => {
@@ -222,15 +227,29 @@ export default function AgentProjectWorkspace() {
       appendTurn('assistant', 'text', { text: phaseAgent.question.question })
     }
     appendTurn('user', 'text', { text })
-    return runPhaseAction(() => phaseAgent.send(text, buildPhaseMemory()))
+    return runPhaseAction(() => phaseAgent.send(agentFlow.phase.stage, text))
   }
 
-  const handleContinuePhase = () => {
+  const handleContinuePhase = async () => {
+    const group = STAGE_GROUP[agentFlow.phase.stage]
     phaseAgent.reset()
     phaseChatAgent.reset()
     setPhaseStarted(false)
     lastPhaseActionRef.current = null
-    agentFlow.advance()
+    if (group === 'scoping' && scopeSpecification) {
+      try {
+        const { scope_title, scope_description } = await generateScopeDescription(scopeSpecification)
+        await store.setScopeMetadata(id, { scope_title, scope_description })
+      } catch {
+        // Best-effort, like AgentLandingPage's own generateTitle call - the scope's content is
+        // already saved regardless; only its title/description would be missing.
+      }
+    }
+    try {
+      await store.setConversationCompleted(id, group, true)
+    } finally {
+      agentFlow.advance()
+    }
   }
 
   const handleManualAction = (key) => {
@@ -253,19 +272,16 @@ export default function AgentProjectWorkspace() {
   }
 
   // "Chat with AI" during a phase talks to that phase's dedicated `<phase>_chat` stage, not the
-  // phase's own conversation - a fresh, separate conversation from `phaseAgent`. Falls back to
-  // the last real phase's chat stage once every phase is done (`agentFlow.phase` is null there).
-  // During scoping_chat specifically, a completed turn that parses as a scope spec (the agent
-  // applying a requested change) replaces the locally stored one, same as the scoping phase's own
-  // completion does.
+  // phase's own conversation - both persist to the same conversation server-side (see
+  // STAGE_GROUP), so this is still a logically separate exchange from `phaseAgent`, just sharing
+  // history now instead of each holding its own copy. Falls back to the last real phase's chat
+  // stage once every phase is done (`agentFlow.phase` is null there). During scoping_chat
+  // specifically, a completed turn that parses as a scope spec (the agent applying a requested
+  // change) replaces the locally stored one, same as the scoping phase's own completion does.
   const handlePhaseChatMessage = async (text) => {
     appendTurn('user', 'text', { text })
     const chatPhase = agentFlow.phase ?? AGENT_PHASES[AGENT_PHASES.length - 1]
-    const memory = buildPhaseMemory()
-    const result =
-      phaseChatAgent.status === null
-        ? await phaseChatAgent.start(chatPhase.chatStage, text, memory)
-        : await phaseChatAgent.send(text, memory)
+    const result = await phaseChatAgent.send(chatPhase.chatStage, text)
 
     if (!result.ok) {
       appendTurn('assistant', 'error', { text: result.error })
@@ -307,7 +323,7 @@ export default function AgentProjectWorkspace() {
   }
 
   // Turns a stored turn (see `appendTurn`) back into markup - used for both freshly-appended
-  // turns and ones restored from a previous visit.
+  // turns and ones reconstructed from persisted messages on load.
   const renderTurnBody = (turn) => {
     switch (turn.kind) {
       case 'text':
@@ -389,7 +405,9 @@ export default function AgentProjectWorkspace() {
     )
   }
 
-  if (!project) return <p className="page-status error">Agent project not found.</p>
+  if (loading) return <p className="page-status">Loading project…</p>
+  if (error) return <p className="page-status error">{error}</p>
+  if (!project) return null
 
   return (
     <div className="workspace">
@@ -414,16 +432,12 @@ export default function AgentProjectWorkspace() {
       </header>
 
       <div className="workspace-thread">
-        <ChatTurn role="user">
-          <p className="turn-lede">Research description:</p>
-          <p>{project.description}</p>
-          {project.inclusion_criteria && (
-            <>
-              <p className="turn-lede">Inclusion / exclusion criteria:</p>
-              <p>{project.inclusion_criteria}</p>
-            </>
-          )}
-        </ChatTurn>
+        {project.inclusion_criteria && (
+          <ChatTurn role="user">
+            <p className="turn-lede">Inclusion / exclusion criteria:</p>
+            <p>{project.inclusion_criteria}</p>
+          </ChatTurn>
+        )}
 
         {conversation.map((turn) => (
           <ChatTurn key={turn.id} role={turn.role} wide={turn.role === 'assistant'}>

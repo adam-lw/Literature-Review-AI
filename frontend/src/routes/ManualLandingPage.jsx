@@ -3,14 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useProjects } from '../context/ProjectsContext.jsx'
 import QueryListInput from '../components/QueryListInput.jsx'
 import EmbeddingRunSelect from '../components/EmbeddingRunSelect.jsx'
-import CriteriaEditor from '../components/CriteriaEditor.jsx'
 
 export default function ManualLandingPage() {
   const navigate = useNavigate()
   const { createProject } = useProjects()
   const [queries, setQueries] = useState([''])
   const [embeddingRunId, setEmbeddingRunId] = useState(null)
-  const [criteria, setCriteria] = useState('')
   const [nResults, setNResults] = useState(10)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -27,7 +25,6 @@ export default function ManualLandingPage() {
       const project = await createProject({
         queries: nonBlankQueries,
         embedding_run_id: embeddingRunId,
-        inclusion_criteria: criteria.trim() || null,
         n_results: nResults,
       })
       navigate(`/projects/${project.project_id}`)
@@ -53,9 +50,6 @@ export default function ManualLandingPage() {
 
         <label className="field-label">Search model</label>
         <EmbeddingRunSelect value={embeddingRunId} onChange={setEmbeddingRunId} />
-
-        <label className="field-label">Inclusion / exclusion criteria (optional)</label>
-        <CriteriaEditor value={criteria} onChange={setCriteria} />
 
         <label className="field-label">Results per term</label>
         <input

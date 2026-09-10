@@ -1,11 +1,12 @@
 import { apiClient } from '../api/client.js'
 
-// Normalises a server ProjectOut/ProjectSummaryOut into the shape shared by both stores.
-// The backend never returns a `mode` field (see literature_ai/app/api/models.py) — every
-// project reachable through this store was created via the manual flow, since agent projects
-// live in AgentLocalStore instead, so 'manual' is a safe constant here rather than a guess.
+// Normalises a server ProjectOut/ProjectSummaryOut into the shape shared across the app - just
+// renames `project_mode` (the backend's persisted, truthful field) to `mode`, the name every
+// route/component already reads (ProjectSidebar, AgentProjectWorkspace, ...). Every project -
+// agent-created or human-created alike - is a real `app.projects` row now, so this store is the
+// single source for both; there is no separate agent-project store any more.
 function normaliseProject(p) {
-  return { ...p, mode: 'manual' }
+  return { ...p, mode: p.project_mode }
 }
 
 export const ServerStore = {
@@ -21,6 +22,19 @@ export const ServerStore = {
       inclusion_criteria,
       n_results,
     })
+    return normaliseProject(project)
+  },
+
+  async createAgentProject({ inclusion_criteria, project_title }) {
+    const project = await apiClient.post('/projects/agent-mode', {
+      inclusion_criteria,
+      project_title,
+    })
+    return normaliseProject(project)
+  },
+
+  async createAgentProjectFromScope(scopeId) {
+    const project = await apiClient.post('/projects/agent-mode/from-scope', { scope_id: scopeId })
     return normaliseProject(project)
   },
 
@@ -57,5 +71,30 @@ export const ServerStore = {
   async listEmbeddingRuns() {
     const { runs } = await apiClient.get('/embedding-models')
     return runs
+  },
+
+  // Persisted 3-phase flow, backed by app.conversations/app.messages/app.scopes.
+  async getConversations(projectId) {
+    return apiClient.get(`/projects/${projectId}/conversations`)
+  },
+
+  async getScope(projectId) {
+    return apiClient.get(`/projects/${projectId}/scope`)
+  },
+
+  async setConversationCompleted(projectId, stage, completed) {
+    return apiClient.patch(`/projects/${projectId}/conversations/${stage}`, { completed })
+  },
+
+  async setScopeMetadata(projectId, { scope_title, scope_description }) {
+    return apiClient.patch(`/projects/${projectId}/scope`, { scope_title, scope_description })
+  },
+
+  // Recently-finalized scopes across all projects, for the agent landing page's "start review
+  // from an existing scope" list - ranked by recency, optionally filtered by a search term.
+  async listRecentScopes(search) {
+    const query = search ? `?search=${encodeURIComponent(search)}` : ''
+    const { scopes } = await apiClient.get(`/scopes${query}`)
+    return scopes
   },
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjects } from '../context/ProjectsContext.jsx'
 import { generateTitle } from '../api/agentClient.js'
+import RecentScopesPanel from '../components/RecentScopesPanel.jsx'
 
 export default function AgentLandingPage() {
   const navigate = useNavigate()
@@ -23,11 +24,12 @@ export default function AgentLandingPage() {
       // Title generation is best-effort - fall back to the local store's placeholder title.
     }
     const project = await createAgentProject({
-      description: trimmedDescription,
       inclusion_criteria: null,
       project_title,
     })
-    navigate(`/agent-projects/${project.project_id}`)
+    // Not persisted server-side - it's sent as the scoping phase's opening instruction the first
+    // time it starts (see AgentProjectWorkspace.jsx), which is also where it ends up logged.
+    navigate(`/agent-projects/${project.project_id}`, { state: { initialDescription: trimmedDescription } })
   }
 
   return (
@@ -54,6 +56,8 @@ export default function AgentLandingPage() {
           {submitting ? 'Starting…' : 'Start agent project'}
         </button>
       </form>
+
+      <RecentScopesPanel />
     </div>
   )
 }
