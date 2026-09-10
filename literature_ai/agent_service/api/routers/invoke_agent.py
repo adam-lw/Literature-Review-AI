@@ -288,15 +288,6 @@ def _to_response(
         if include_messages
         else []
     )
-    common = dict(
-        messages=messages,
-        reasoning=agent_response.reasoning,
-        conversation_id=conversation_id,
-        new_messages=new_messages or [],
-        scope=scope,
-        reviews=reviews,
-    )
-
     if isinstance(agent_response.result, Question):
         return InvokeAgentResponse(
             status=agent_response.status,
@@ -306,13 +297,23 @@ def _to_response(
                 options=agent_response.result.options,
                 allows_freetext=agent_response.result.allows_freetext,
             ),
-            **common,
+            messages=messages,
+            reasoning=agent_response.reasoning,
+            conversation_id=conversation_id,
+            new_messages=new_messages or [],
+            scope=scope,
+            reviews=reviews,
         )
 
     return InvokeAgentResponse(
         status=agent_response.status,
         response=agent_response.result.content,
-        **common,
+        messages=messages,
+        reasoning=agent_response.reasoning,
+        conversation_id=conversation_id,
+        new_messages=new_messages or [],
+        scope=scope,
+        reviews=reviews,
     )
 
 
