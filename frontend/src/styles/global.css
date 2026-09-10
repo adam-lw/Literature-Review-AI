@@ -418,6 +418,51 @@ a {
   resize: vertical;
 }
 
+/* Recent scopes panel */
+
+.recent-scopes-panel {
+  margin-top: var(--space-7);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+}
+
+.scope-search-form {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.scope-search-form input {
+  flex: 1;
+  padding: var(--space-3);
+  font-size: 1rem;
+}
+
+.scope-search-btn {
+  flex-shrink: 0;
+  background: var(--accent);
+  color: var(--accent-text);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-5);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.scope-search-btn:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding: var(--space-6) var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
 /* Workspace (chat-like long page) */
 
 .page-status {
