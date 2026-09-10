@@ -3,7 +3,11 @@
 
 - [(WIP) Agent-driven Systematic Reviews](#wip-agent-driven-systematic-reviews)
   - [Description](#description)
-    - [Functionality Progress](#functionality-progress)
+  - [Screenshots](#screenshots)
+  - [Installation \& Usage](#installation--usage)
+    - [Setup](#setup)
+    - [Uninstall](#uninstall)
+  - [Functionality Progress](#functionality-progress)
   - [Background](#background)
   - [Technical Description](#technical-description)
     - [Application Design](#application-design)
@@ -16,11 +20,43 @@
 
 This project is an attempt to produce a fully end-to-end agentic approach to systematic review synthesis, while ensuring full human-in-the-loop visibility, and detailed logging & traceability to ensure confidence in the outputted results. It covers all steps in an end-to-end pipeline, from defining the bounds of the research & research questions, through to paper discovery, paper inclusion/exclusion assessment, and paper synthesis & validation.
 
-The project was initially started with the goal of accurately and reliably synthesising literature reviews across any domain of research. This isn't a new goal - many AI research tools already exist like [Gemini Notebook](https://notebook.google) (formerly NotebookLM) by Google, or integrated AI tools in existing research apps like [Mendeley](https://www.mendeley.com/features#ai) - yet these tools often share one key weakness in common: their tools are not transparent, they are not reproducible, and often rely on manual intervention to do a lot of the heavy lifting during the production of the review. In particular, the transparency and reproducibility are critical when producing systematic reviews, which must clearly document their discovery approaches, inclusion/exclusion criteria, and reasoning.
+The project was initially started with the goal of accurately and reliably synthesising literature reviews across any domain of research. This isn't a new goal - many AI research tools already exist including [Gemini Notebook](https://notebook.google) (formerly NotebookLM) by Google, or integrated AI tools in existing research apps like [Mendeley](https://www.mendeley.com/features#ai) - yet these tools often share some key weaknesses in common: the outputs of the AI are not necessarily reproducible or reliably correct, and when producing systematic review papers, researchers are often forced to manually intervene to validate & synthesise AI outputs into the desired format.
+
+Transparency and reproducibility are critical when producing systematic reviews, which must clearly document their discovery approaches, inclusion/exclusion criteria & results with a PRISMA diagram, and reasoning behind each of these areas. Therefore, this project aims to set out to produce a system that would facilitate an end-to-end production of a systematic review paper, including full visibility and Human-in-the-Loop capabilities.
 
 The project implements a full microservice architecture via Docker, including a stateless agent/LLM service, a RAG/paper storing service, an application layer for managing user projects, batch pipelines, a GROBID PDF parsing container, and a PostgreSQL + pgvector container for hosting the database. It heavily relies on OOP to ensure flexibility and maintainability, including easily extendible LLM/embeddings interfaces to allow for seamless integration of new models.
 
-### Functionality Progress
+## Screenshots
+
+**Manual Paper Semantic Search + Inclusion / Exclusion**
+![Search demo](docs/search_demo.png)
+
+**Agent-Driven Project Scoping Assistant**
+![Agent demo](docs/agent_demo.png)
+
+**Langfuse Integration**
+![Langfuse demo](docs/langfuse_demo.png)
+
+## Installation & Usage
+### Setup
+1. Clone this repo and ensure you have Docker installed locally on your machine.
+2. Initialise the project & its services with the below commands:
+```
+cd literature-ai
+docker compose up
+```
+3. If you wish to use the AI-powered features, you may choose to paste your OpenAI/Anthropic API keys in .env. *Note: application currently defaults to OpenAI models only*
+4. Navigate to the UI on `localhost:5173`
+
+### Uninstall
+To uninstall the project:
+1. Run:
+```
+docker compose down
+```
+2. Delete this repo. It is entirely self-contained, so all collected & generated data is persisted within this file structure.
+
+## Functionality Progress
 The project is currently WIP - below is a summary of the completed functionality, as included in the `dev` branch.
 
 - 🟢 **Data Collection & Processing** - Complete
@@ -45,7 +81,7 @@ The project is currently WIP - below is a summary of the completed functionality
 - 🟢 **RAG Chunk & Paper Content Search**
   - Chunking of retrieved papers & semantic search over them for paper review & citation.
 
-- 🟡 **Inclusion / Exclusion Criteria Assessment Agent** - Experimental
+- 🟡 **Inclusion / Exclusion Criteria Assessment Agent** - Currently experimental
 
 - 🟡 **Paper Writing Agent** - WIP
 
@@ -68,8 +104,6 @@ Therefore, this project set out three key goals:
 
 ## Technical Description
 ### Application Design
-**High-Level Conceptual Diagram**
-![System Design Diagram](./documentation/system_design_diagram.jpg)
 
 The system and its control flow are implemented from scratch in Python. It relies on a mixture of an agentic & rules-based DAG to manage control flow, using a [ReAct](https://arxiv.org/abs/2210.03629)-like agent design with tool calling to manage execution and state. A flexible interface is made available allowing vendor-agnostic LLM, embedding, and paper collection tools, with OpenAI and Anthropic models currently being made available. An asynchronous design with asyncio is used throughout the application to allow concurrent agentic execution and efficient API usage. Langfuse is implemented for basic logging and observability, and a human-in-the-loop user interface is currently in development.
 
@@ -80,6 +114,3 @@ To build the dataset used to perform the selected semantic & keyword-based searc
 The title and abstract from each paper are then used to generate text embeddings, which are stored in a seperate Postgres database using pgvector, indexed using HNSW for faster searching. This is currently being experimentally combined with a keyword search approach (BM25) creating a hybrid search, due to the potential benefits of precise phrase matching during paper collection in a scientific context.
 
 The reasoning behind this overall approach is partially down to several technical limitations. Firstly, there is an extremely large number of research papers - over 200 million - which obviously poses a technical limitation on the volume of papers that can be processed due to hardware & storage limitations. This has required me to significantly subset the overall search space by caching papers by topic, which may unintentionally exclude papers from a search. Secondly, semantic search begins to break down after the number of embeddings exceeds a certain point (~10^7) due to vector crowding, which forces the use of title and abstract embeddings only, rather than a full paper chunking approach.
-
-To allow AI agents to collect papers in parallel without exceeding the API's rate limits, I have implemented a dispatcher/consumer architecture with asyncio which automatically manages concurrent requests from multiple agents, while exposing an easily configurable config for managing APIs. This is made available via a helper function, `call_api`.
-
