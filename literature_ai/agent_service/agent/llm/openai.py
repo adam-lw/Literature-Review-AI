@@ -52,7 +52,7 @@ class OpenAiLLM(LLM):
     async def call(
         self, messages: Messages, tools: Optional[list[Tool]] = None
     ) -> LLMResponse:
-        messages_text = "\n".join(f"{m.role}: {m.text()}" for m in messages)
+        messages_text = "\n".join(f"{m.role}: {m.content}" for m in messages)
 
         config = cast(Mapping[str, Any], self.config)
 
