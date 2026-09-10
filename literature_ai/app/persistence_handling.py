@@ -723,6 +723,18 @@ def delete_review(conversation_id: str, paper_id: str) -> None:
         )
 
 
+def set_reviews(conversation_id: str, reviews: dict[str, dict[str, Any]]) -> None:
+    """Wholesale-replaces a review conversation's verdicts: upserts every paper_id in `reviews`,
+    deletes every previously-reviewed paper_id not in it. `reviews` is expected to be the
+    agent's complete current picture (its `AgentPaperReviewMemory`), not a diff - matching
+    `upsert_scope`'s "always a full replacement" semantics for the same reason."""
+    prior_paper_ids = {r["paper_id"] for r in list_reviews(conversation_id)}
+    for paper_id, content in reviews.items():
+        upsert_review(conversation_id, paper_id, content)
+    for deleted_paper_id in prior_paper_ids - set(reviews):
+        delete_review(conversation_id, deleted_paper_id)
+
+
 def set_inclusion(result_id: str, included: bool) -> None:
     """Resolves result_id to (project_id, paper_id) and upserts the shared review verdict for
     that paper - keyed by paper, not by search result, so the same paper found via two
