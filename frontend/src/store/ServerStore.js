@@ -74,9 +74,10 @@ export const ServerStore = {
   },
 
   // Persisted 3-phase flow, backed by app.conversations/app.messages/app.scopes/app.reviews.
-  // The agent service (agent_service/api/routers/invoke_agent.py) writes none of this itself -
-  // it hands back what a turn produced (new_messages/scope/reviews on its response), and
-  // `usePhaseAgent.send` calls the relevant methods below to persist it, right after getting it.
+  // The agent service (agent_service/api/routers/invoke_agent.py) is fully stateless and writes
+  // none of this - `usePhaseAgent` reads conversation/scope/review state through these methods
+  // to build each turn's call, then calls the relevant `set*`/`add*` method below to persist
+  // what that turn produced, right after getting it back.
   async getConversations(projectId) {
     return apiClient.get(`/projects/${projectId}/conversations`)
   },
@@ -91,6 +92,11 @@ export const ServerStore = {
 
   async setScope(projectId, content) {
     return apiClient.put(`/projects/${projectId}/scope`, { content })
+  },
+
+  async getReviews(projectId) {
+    const { reviews } = await apiClient.get(`/projects/${projectId}/reviews`)
+    return reviews
   },
 
   async setReviews(projectId, reviews) {

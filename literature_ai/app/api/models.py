@@ -143,8 +143,8 @@ class MessageCreateRequest(BaseModel):
 
 
 class MessagesCreateRequest(BaseModel):
-    # Persists what one agent_service invoke-agent call produced - see
-    # agent_service/api/models.py's InvokeAgentResponse.new_messages, which this shape mirrors.
+    # Persists turns the caller (the frontend, driving the now-stateless agent_service directly)
+    # decided to keep from one invoke-agent call - see MessageCreateRequest.
     messages: list[MessageCreateRequest] = Field(..., min_length=1)
 
 
@@ -161,6 +161,13 @@ class ReviewInput(BaseModel):
 
 class ReviewsSetRequest(BaseModel):
     # The complete current set of verdicts (not a diff) - see persistence_handling.set_reviews.
+    reviews: list[ReviewInput]
+
+
+class ReviewsGetResponse(BaseModel):
+    # The complete current set of verdicts for the project's review-stage conversation - what a
+    # caller resuming `review_chat`/`writing_chat` needs to seed a `review`-typed MemoryInput
+    # (see agent_service/api/models.py's ReviewMemoryInput) before its next turn.
     reviews: list[ReviewInput]
 
 

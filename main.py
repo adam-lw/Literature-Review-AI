@@ -33,7 +33,11 @@ from literature_ai.agent_service.api.routers.generate_title import (
 from literature_ai.agent_service.api.routers.generate_scope_description import (
     router as generate_scope_description_router,
 )
+from literature_ai.agent_service.api.routers.call_llm import router as call_llm_router
 from literature_ai.search_service.api.routers.search import router as search_router
+from literature_ai.review_service.api.routers.generate_review import (
+    router as generate_review_router,
+)
 from literature_ai.db import apply_schema
 
 _REPO_ROOT = Path(__file__).resolve().parent
@@ -58,7 +62,9 @@ app.include_router(rag_paper_chunks_router, prefix="/api")
 app.include_router(invoke_agent_router, prefix="/api")
 app.include_router(generate_title_router, prefix="/api")
 app.include_router(generate_scope_description_router, prefix="/api")
+app.include_router(call_llm_router, prefix="/api")
 app.include_router(search_router, prefix="/api")
+app.include_router(generate_review_router, prefix="/api")
 app.include_router(health_router, prefix="/api")
 app.include_router(projects_router, prefix="/api")
 app.include_router(results_router, prefix="/api")

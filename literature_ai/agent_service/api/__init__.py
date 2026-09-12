@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from literature_ai.agent_service.agent.tools import register_all_tools
+from literature_ai.agent_service.api.routers.call_llm import router as call_llm_router
 from literature_ai.agent_service.api.routers.generate_scope_description import (
     router as generate_scope_description_router,
 )
@@ -22,3 +23,4 @@ app = FastAPI(
 app.include_router(invoke_agent_router)
 app.include_router(generate_title_router)
 app.include_router(generate_scope_description_router)
+app.include_router(call_llm_router)

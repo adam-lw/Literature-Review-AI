@@ -1,33 +1,18 @@
 import { apiClient } from './client.js'
 
-// Talks to literature_ai/agent_service/api/routers/invoke_agent.py. That router has two
-// contracts:
+// Talks to literature_ai/agent_service/api/routers/invoke_agent.py - a single, fully stateless
+// contract used for every stage (scoping/scoping_chat/search_review/review_chat/writing/
+// writing_chat, and chatbot/orchestrator outside the phase flow alike). The backend keeps no
+// memory between calls: callers must resend the previous response's `messages` (plus their new
+// turn) and `memory` on every follow-up call, and read the response's own echoed-back `memory`
+// to see what a tool call changed (see `usePhaseAgent.js`/`useAgentConversation.js`).
 //
-// - The persisted 3-phase flow (scoping/scoping_chat/search_review/review_chat/writing/
-//   writing_chat) - `sendPhaseMessage` below. The backend loads conversation history, scope,
-//   and review state from Postgres itself, keyed by `project_id` + `stage` - callers only ever
-//   send the new message, never a history/memory payload to resend.
-// - The legacy, fully-stateless contract used only by `chatbot`/`orchestrator` (outside the
-//   3-phase flow) - `createAgent`/`invokeAgent` below. Both keep no memory between calls, so
-//   callers must resend the previous response's `messages` (plus their new turn), and must
-//   resend `memory`, on every follow-up call.
-//
-// `memory` (legacy contract only) is a list of tagged inputs matching the backend's
-// `MemoryInput` discriminated union (see `agent_service/api/models.py`) - build entries with
-// `paperListMemory`/`scopingMemory` below rather than constructing the `{ type, ... }` shape by
-// hand.
+// `memory` is a list of tagged inputs matching the backend's `MemoryInput` discriminated union
+// (see `agent_service/api/models.py`) - build entries with `paperListMemory`/`scopingMemory`/
+// `reviewMemory` below rather than constructing the `{ type, ... }` shape by hand.
 //
 // `sessionId` doesn't affect the response - it's forwarded as-is so the backend can group a
 // conversation's per-call Langfuse traces into one session in the dashboard.
-
-export async function sendPhaseMessage(projectId, stage, message, sessionId) {
-  return apiClient.post('/invoke-agent', {
-    stage,
-    project_id: projectId,
-    message,
-    ...(sessionId ? { session_id: sessionId } : {}),
-  })
-}
 
 export function paperListMemory(name, papers) {
   return { type: 'paper_list', name, papers }
@@ -35,6 +20,10 @@ export function paperListMemory(name, papers) {
 
 export function scopingMemory(specification) {
   return { type: 'scoping', specification }
+}
+
+export function reviewMemory(reviews) {
+  return { type: 'review', reviews }
 }
 
 export async function createAgent(stage, content, memory, sessionId) {

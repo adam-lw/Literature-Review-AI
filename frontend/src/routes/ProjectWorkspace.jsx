@@ -140,10 +140,11 @@ export default function ProjectWorkspace() {
     return { searches: project.searches.length, papers, included }
   }, [project])
 
-  // Paper context for the legacy freeform "chatbot" conversation only - the persisted 3-phase
-  // flow (phaseAgent/phaseChatAgent) no longer needs this resent; the backend derives it from
-  // app.search_results/app.reviews itself. Only included papers are sent, matching the "ask
-  // about the N included papers" framing shown in the chat prompt.
+  // Paper context for the legacy freeform "chatbot" conversation only - `phaseAgent`/
+  // `phaseChatAgent` build their own paper/review memory fresh from app.search_results/
+  // app.reviews on every call instead (see `usePhaseAgent.js`'s `loadMemory`). Only included
+  // papers are sent here, matching the "ask about the N included papers" framing shown in the
+  // chat prompt.
   const includedPaperMemory = useMemo(() => {
     if (!project) return undefined
     const papers = project.searches.flatMap((s) =>

@@ -175,10 +175,10 @@ def update_conversation(
 def add_conversation_messages(
     project_id: str, stage: str, request: models.MessagesCreateRequest
 ) -> models.ConversationWithMessagesOut:
-    """Appends turns an agent_service invoke-agent call produced (see that service's
-    `InvokeAgentResponse.new_messages`) to a stage's conversation - the agent service itself
-    writes no conversation content to Postgres, so this is how the caller persists what it got
-    back, right after it gets it. Creates the conversation if this is its very first turn."""
+    """Appends turns the caller decided to keep from an agent_service invoke-agent call's full
+    `messages` trace (agent_service itself writes nothing to Postgres) to a stage's conversation
+    - this is how the caller persists what it got back, right after it gets it. Creates the
+    conversation if this is its very first turn."""
     _try_get_project(project_id)
     conversation = db.get_or_create_conversation(project_id, stage, "agent")
     db.add_messages(
@@ -221,21 +221,46 @@ def update_project_scope(
 
 @router.put("/{project_id}/scope", response_model=models.ScopeOut)
 def set_project_scope(project_id: str, request: models.ScopeUpdateRequest) -> models.ScopeOut:
-    """Persists a scope specification an invoke-agent call handed back (`InvokeAgentResponse.
-    scope`) - see the scoping phase's `_run_phase_agent` for when that's set. Creates the
-    scoping conversation if it doesn't exist yet (finalizing a scope is always that
-    conversation's first turn or later)."""
+    """Persists a scope specification the caller extracted from an invoke-agent turn (either
+    parsed from the main `scoping` agent's raw-JSON finalization, or from `scoping_chat`'s
+    echoed-back `scoping`-typed memory after `update_scope` mutated it - see
+    agent_service/api/models.py's InvokeAgentResponse.memory). Creates the scoping conversation
+    if it doesn't exist yet (finalizing a scope is always that conversation's first turn or
+    later)."""
     _try_get_project(project_id)
     conversation = db.get_or_create_conversation(project_id, "scoping", "agent")
     scope = db.upsert_scope(str(conversation["conversation_id"]), request.content)
     return models.ScopeOut(**scope)
 
 
+@router.get("/{project_id}/reviews", response_model=models.ReviewsGetResponse)
+def get_project_reviews(project_id: str) -> models.ReviewsGetResponse:
+    """The project's current review verdicts - what a caller resuming `review_chat`/
+    `writing_chat` reads back to seed a `review`-typed memory input for its next agent_service
+    call (see agent_service/api/models.py's ReviewMemoryInput)."""
+    _try_get_project(project_id)
+    conversation = db.get_conversation(project_id, "review")
+    if conversation is None:
+        return models.ReviewsGetResponse(reviews=[])
+    reviews = db.list_reviews(str(conversation["conversation_id"]))
+    return models.ReviewsGetResponse(
+        reviews=[
+            models.ReviewInput(
+                paper_id=r["paper_id"],
+                reviewed=r["content"].get("reviewed", False),
+                included=r["content"].get("included", False),
+                inclusion_reasoning=r["content"].get("inclusion_reasoning", {}),
+            )
+            for r in reviews
+        ]
+    )
+
+
 @router.put("/{project_id}/reviews")
 def set_project_reviews(project_id: str, request: models.ReviewsSetRequest) -> dict:
-    """Persists the review stage's current verdicts an invoke-agent call handed back
-    (`InvokeAgentResponse.reviews`) - a wholesale replacement, not a diff, matching
-    `set_reviews`."""
+    """Persists the review stage's current verdicts the caller extracted from an invoke-agent
+    turn's echoed-back `review`-typed memory (see agent_service/api/models.py's
+    InvokeAgentResponse.memory) - a wholesale replacement, not a diff, matching `set_reviews`."""
     _try_get_project(project_id)
     conversation = db.get_or_create_conversation(project_id, "review", "agent")
     reviews = {

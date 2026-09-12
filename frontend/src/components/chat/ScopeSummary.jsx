@@ -49,7 +49,7 @@ export default function ScopeSummary({ specification }) {
   const topical = spec.topical_relevance || {}
   const termMap = topical.term_map || {}
   const borderlineCases = topical.resolved_borderline_cases || []
-  const openItems = spec.open_items || []
+  const extractionSchema = spec.extraction_schema || []
 
   return (
     <div className="scope-summary">
@@ -80,7 +80,6 @@ export default function ScopeSummary({ specification }) {
         <Field label="Search cutoff date" value={timeWindow.search_cutoff_date} />
         <Field label="Domain bounds" value={review.domain_bounds} />
         <ChipGroup label="Publication types" items={review.publication_types_included} />
-        <Field label="Rigor level" value={review.rigor_level} />
       </Section>
 
       <Section title="Inclusion / exclusion criteria">
@@ -138,17 +137,17 @@ export default function ScopeSummary({ specification }) {
         </Section>
       )}
 
-      {openItems.length > 0 && (
-        <div className="scope-callout scope-callout-warning">
-          <span className="scope-callout-title">Open items</span>
+      {extractionSchema.length > 0 && (
+        <Section title="Extraction schema">
           <ul className="scope-list">
-            {openItems.map((item) => (
-              <li key={item.field}>
-                <strong>{item.field}</strong>: {item.reason}
+            {extractionSchema.map((field) => (
+              <li key={field.field_name}>
+                <strong>{field.field_name}</strong>
+                {field.description && `: ${field.description}`}
               </li>
             ))}
           </ul>
-        </div>
+        </Section>
       )}
 
       {spec.scope_risk_note && (

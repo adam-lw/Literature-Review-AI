@@ -271,6 +271,77 @@ def test_project_conversations_and_scope_endpoints(monkeypatch):
         assert response.json()["completed"] is True
 
 
+def test_get_project_reviews(monkeypatch):
+    """`GET /projects/{id}/reviews` is what a caller resuming `review_chat`/`writing_chat` reads
+    to seed a `review`-typed memory input on its next agent_service call - agent_service itself
+    is stateless and no longer loads this from Postgres (see agent_orchestration removal from
+    invoke_agent.py)."""
+    monkeypatch.setattr(app_api, "apply_schema", lambda path: None)
+    project_id = uuid.uuid4()
+    conversation_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+
+    with TestClient(app_api.app) as client:
+        monkeypatch.setattr(projects_router.db, "get_project", lambda pid: _fake_project(project_id))
+
+        # No review-stage conversation yet - an empty list, not a 404 (a project that hasn't
+        # reached search_review yet has no reviews to seed).
+        monkeypatch.setattr(projects_router.db, "get_conversation", lambda pid, stage: None)
+        response = client.get(f"/projects/{project_id}/reviews")
+        assert response.status_code == 200
+        assert response.json() == {"reviews": []}
+
+        review_conversation = {
+            "conversation_id": conversation_id,
+            "project_id": project_id,
+            "stage": "review",
+            "mode": "agent",
+            "completed": False,
+            "author": None,
+            "created_at": now,
+            "updated_at": now,
+        }
+        monkeypatch.setattr(
+            projects_router.db,
+            "get_conversation",
+            lambda pid, stage: review_conversation if stage == "review" else None,
+        )
+        monkeypatch.setattr(
+            projects_router.db,
+            "list_reviews",
+            lambda cid: [
+                {
+                    "review_id": uuid.uuid4(),
+                    "conversation_id": cid,
+                    "paper_id": "abc123",
+                    "content": {
+                        "reviewed": True,
+                        "included": True,
+                        "inclusion_reasoning": {
+                            "methodological_focus": {"passed": True, "reason": "matches"}
+                        },
+                    },
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            ],
+        )
+        response = client.get(f"/projects/{project_id}/reviews")
+        assert response.status_code == 200
+        assert response.json() == {
+            "reviews": [
+                {
+                    "paper_id": "abc123",
+                    "reviewed": True,
+                    "included": True,
+                    "inclusion_reasoning": {
+                        "methodological_focus": {"passed": True, "reason": "matches"}
+                    },
+                }
+            ]
+        }
+
+
 def test_update_project_scope_metadata(monkeypatch):
     monkeypatch.setattr(app_api, "apply_schema", lambda path: None)
     project_id = uuid.uuid4()

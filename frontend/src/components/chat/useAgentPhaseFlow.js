@@ -33,8 +33,10 @@ export const AGENT_PHASES = [
 
 // Maps every backend `stage` string (both a phase's own stage and its "_chat" companion) onto
 // app.conversations' 3-value stage enum (scoping|review|writing) - the two calls for a phase
-// share one persisted conversation server-side (see routers/invoke_agent.py's _STAGE_GROUP),
-// so this is what the frontend uses to fetch/complete that shared conversation by phase.
+// share one persisted conversation, and since agent_service is fully stateless and has no
+// notion of "phase" at all, this mapping lives only here: the frontend uses it both to resolve
+// which shared conversation a call reads/writes (see `usePhaseAgent.js`) and to fetch/complete
+// that conversation by phase elsewhere.
 export const STAGE_GROUP = {
   scoping: 'scoping',
   scoping_chat: 'scoping',
