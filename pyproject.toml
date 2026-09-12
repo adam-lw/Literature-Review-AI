@@ -29,6 +29,8 @@ dependencies = [
     "fastapi>=0.115.0,<1.0.0",
     "uvicorn[standard]>=0.34.0,<1.0.0",
     "langfuse>=4.14.4",
+    "langgraph>=1.2.11",
+    "kneed>=0.8.6",
 ]
 
 [dependency-groups]
@@ -91,5 +93,5 @@ extend-exclude = ["notebooks"]
 [[tool.mypy.overrides]]
 # No type stubs published for these, and torch isn't installed by default
 # (it's an opt-in extra - see [project.optional-dependencies] above).
-module = ["langdetect", "adapters", "torch", "torch.*"]
+module = ["langdetect", "adapters", "torch", "torch.*", "kneed"]
 ignore_missing_imports = true
