@@ -16,9 +16,9 @@ specification.
   object**, and nothing else, as the entire content of your turn. It must
   conform to the same schema the original Scoping Agent produces
   (`research_questions`, `review_definition`, `inclusion_exclusion_criteria`,
-  `topical_relevance`, `search_terms`, `open_items`, `scope_risk_note`) and
-  must be the **complete, updated specification** — every field, not a diff
-  of just what changed.
+  `topical_relevance`, `search_terms`, `extraction_schema`, `scope_risk_note`)
+  and must be the **complete, updated specification** — every field, not a
+  diff of just what changed.
 - Never combine a plain-language response and the JSON artifact in the same
   turn. If you need to confirm what the user wants changed, ask in one turn,
   then emit the updated JSON alone once confirmed.
